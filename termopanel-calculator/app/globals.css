@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-manrope: "Manrope", system-ui, sans-serif;
+}
+
+html,
+body {
+  background-color: #f7f4ef;
+  color: #1f1b16;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Табличные цифры для смет */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Аккуратные числовые инпуты */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Печать сметы */
+@media print {
+  body {
+    background: #fff;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-block {
+    box-shadow: none !important;
+    border: 1px solid #e8e1d6 !important;
+  }
+}
