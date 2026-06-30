@@ -50,3 +50,4 @@ lib/
   textures.ts           каталог цветов травертина
   image.ts              сжатие фото через canvas
 ```
+<!-- redeploy -->
