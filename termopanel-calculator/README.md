@@ -50,4 +50,10 @@ lib/
   textures.ts           каталог цветов травертина
   image.ts              сжатие фото через canvas
 ```
-<!-- redeploy -->
+
+## Деплой на Vercel
+Приложение лежит в подпапке `termopanel-calculator/`. В настройках проекта Vercel
+**Root Directory** должен быть = `termopanel-calculator`. `vercel.json` задаёт
+framework-хинт (`nextjs`), но Root Directory настраивается только в дашборде.
+
+<!-- redeploy: fix vercel deploy (framework hint + trigger) -->
