@@ -181,10 +181,12 @@ export async function POST(req: NextRequest) {
       `Keep the facade clean without support brackets.`;
   } else if (withBrackets === true) {
     prompt +=
-      `\n\nAdd decorative facade brackets (corbels) — small ornamental support consoles — ` +
-      `placed evenly along the top of the walls just under the roofline/cornice, and ` +
-      `beside the corners. Render them realistic, symmetric, matching a classic ` +
-      `travertine decor style, natural scale. This is an intended decorative addition.`;
+      `\n\nAdd small decorative corbels (brackets) at the TOP CORNERS of each WINDOW's ` +
+      `trim — where the side pilasters meet the top cornice of the window frame, on the ` +
+      `left and right side of every window. These brackets support the window's top ` +
+      `cornice. Do NOT place any brackets under the roof, on the roofline, on the walls ` +
+      `or at the building corners — ONLY at the upper sides of the window frames. ` +
+      `Small, symmetric, ornamental, matching the classic trim style, natural scale.`;
   }
 
   // Доп. инструкции пользователя
