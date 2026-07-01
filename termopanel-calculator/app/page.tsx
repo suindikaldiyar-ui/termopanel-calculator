@@ -21,7 +21,7 @@ const INITIAL_INPUTS: CalcInputs = {
   ],
   openingList: Array.from({ length: 8 }, () => ({ width: 1.5, height: 1.5 })),
   foundationHeight: 0.8,
-  corners: 4,
+  cornersMeters: 13.6,
 };
 
 export default function Page() {

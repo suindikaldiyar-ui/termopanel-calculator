@@ -222,27 +222,27 @@ export default function ParamsPanel({
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-muted">Количество углов</span>
+          <span className="text-sm font-medium text-muted">Углы</span>
           <div className="relative">
             <input
               type="number"
-              inputMode="numeric"
+              inputMode="decimal"
               min={0}
-              step={1}
+              step={0.1}
               value={
-                Number.isFinite(inputs.corners) && inputs.corners !== 0
-                  ? inputs.corners
+                Number.isFinite(inputs.cornersMeters) && inputs.cornersMeters !== 0
+                  ? inputs.cornersMeters
                   : ""
               }
               placeholder="0"
               onChange={(e) => {
                 const n = Number(e.target.value);
-                onInputs({ ...inputs, corners: Number.isFinite(n) ? n : 0 });
+                onInputs({ ...inputs, cornersMeters: Number.isFinite(n) ? n : 0 });
               }}
               className="tnum w-full rounded-xl border border-line bg-canvas px-3.5 py-2.5 pr-12 text-base font-semibold text-ink outline-none transition placeholder:text-muted/40 focus:border-gold focus:ring-2 focus:ring-gold/30"
             />
             <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-muted">
-              шт
+              м
             </span>
           </div>
         </label>

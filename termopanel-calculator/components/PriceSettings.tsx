@@ -15,7 +15,7 @@ const FIELDS: { key: keyof Prices; label: string; suffix: string; locked?: boole
   { key: "travertinePerBucket", label: "Травертин", suffix: "тг/ведро" },
   { key: "lacquerPerCan", label: "Лак", suffix: "тг/банка" },
   { key: "framingPerMeter", label: "Обрамление", suffix: "тг/м" },
-  { key: "cornerPerUnit", label: "Углы", suffix: "тг/угол" },
+  { key: "cornerPerMeter", label: "Углы", suffix: "тг/м" },
   { key: "foundationMaterialPerM2", label: "Фундамент: материал", suffix: "тг/м²" },
   { key: "foundationPaintPerM2", label: "Фундамент: краска", suffix: "тг/м²" },
 ];

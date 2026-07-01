@@ -31,7 +31,7 @@ export interface CalcInputs {
   wallList: WallItem[]; // стены — каждая вводится отдельно
   openingList: OpeningItem[]; // окна/двери — каждое отдельно
   foundationHeight: number; // высота фундамента, м (утепление 3 см)
-  corners: number; // количество углов, шт
+  cornersMeters: number; // углы, метраж (м), вводится вручную
 }
 
 // Цены — редактируемые в UI ("Настройка цен")
@@ -41,7 +41,7 @@ export interface Prices {
   travertinePerBucket: number; // травертин, тг/ведро
   lacquerPerCan: number; // лак, тг/банка (10кг)
   framingPerMeter: number; // обрамление, тг/м
-  cornerPerUnit: number; // углы, тг/угол
+  cornerPerMeter: number; // углы, тг/м
   foundationMaterialPerM2: number; // фундамент: материал, тг/м²
   foundationPaintPerM2: number; // фундамент: краска, тг/м²
 }
@@ -52,7 +52,7 @@ export const DEFAULT_PRICES: Prices = {
   travertinePerBucket: 9000,
   lacquerPerCan: 22000,
   framingPerMeter: 2500,
-  cornerPerUnit: 3500,
+  cornerPerMeter: 3500,
   foundationMaterialPerM2: 3800,
   foundationPaintPerM2: 1500,
 };
@@ -111,7 +111,7 @@ export function calculate(
   const wallList = inputs.wallList ?? [];
   const openingList = inputs.openingList ?? [];
   const foundationHeight = Math.max(0, inputs.foundationHeight || 0);
-  const corners = Math.max(0, inputs.corners || 0);
+  const cornersMeters = Math.max(0, inputs.cornersMeters || 0);
   const windows = openingList.length; // кол-во окон = число строк списка
 
   // Площадь каждой стены и суммарная
@@ -194,7 +194,7 @@ export function calculate(
   for (const id of decorIds ?? []) {
     const decor = getDecor(id);
     if (!decor) continue;
-    const meters = decorMeters(decor.category, windows, corners, perimeter);
+    const meters = decorMeters(decor.category, windows, cornersMeters, perimeter);
     items.push({
       key: `decor-${decor.id}`,
       name: decor.name,
@@ -205,14 +205,14 @@ export function calculate(
     });
   }
 
-  // 6. Углы = кол-во углов
+  // 6. Углы = метраж углов × цена/метр
   items.push({
     key: "corners",
     name: "Углы",
-    detail: `${corners} ${plural(corners, "угол", "угла", "углов")}`,
-    unitLabel: "тг/угол",
-    unitPrice: prices.cornerPerUnit,
-    total: corners * prices.cornerPerUnit,
+    detail: `${fmtNum(cornersMeters)} м`,
+    unitLabel: "тг/м",
+    unitPrice: prices.cornerPerMeter,
+    total: round(cornersMeters * prices.cornerPerMeter),
   });
 
   // 7. Фундамент = foundationArea × (материал + краска).
