@@ -161,10 +161,12 @@ export async function POST(req: NextRequest) {
   // Обрамление окон — по фото-референсу (IMAGE 3) или по тексту (fallback).
   if (frame && frameAsset) {
     prompt +=
-      `\n\nThe THIRD image shows the window trim/frame style to apply. Add the same style ` +
-      `of decorative trim (surround, side pilasters, top cornice) around EVERY window ` +
-      `of the house, matching the THIRD image. Keep it white/cream, realistic scale. ` +
-      `Only add the frame around each window — do not cover or change the window glass.`;
+      `\n\nIMAGE 3 shows an EXAMPLE of installed window trim on a facade. Replicate the ` +
+      `EXACT same trim profile, shape and proportions around every window of the house ` +
+      `in IMAGE 1. Copy the decorative surround, side pilasters and top cornice as shown ` +
+      `in IMAGE 3 — do NOT invent a different trim. Keep the window GLASS and existing ` +
+      `window frames untouched, add only the decorative surround around them. White/cream, ` +
+      `realistic scale, symmetric.`;
   } else if (frame) {
     prompt +=
       `\n\nAdd decorative window trim around EVERY window of the house: ${frame.hint}. ` +
