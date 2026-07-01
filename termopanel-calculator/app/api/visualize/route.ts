@@ -161,12 +161,12 @@ export async function POST(req: NextRequest) {
   // Обрамление окон — по фото-референсу (IMAGE 3) или по тексту (fallback).
   if (frame && frameAsset) {
     prompt +=
-      `\n\nIMAGE 3 shows an EXAMPLE of installed window trim on a facade. Replicate the ` +
-      `EXACT same trim profile, shape and proportions around every window of the house ` +
-      `in IMAGE 1. Copy the decorative surround, side pilasters and top cornice as shown ` +
-      `in IMAGE 3 — do NOT invent a different trim. Keep the window GLASS and existing ` +
-      `window frames untouched, add only the decorative surround around them. White/cream, ` +
-      `realistic scale, symmetric.`;
+      `\n\nAdd the same window trim as shown in IMAGE 3 around every window. The trim ` +
+      `color MUST be ${frame.color} — do NOT make it white if the reference is dark. ` +
+      `Replicate the EXACT profile, shape and COLOR from IMAGE 3. IMPORTANT: ignore ` +
+      `the window glass, curtains and interior visible in IMAGE 3 — copy ONLY the ` +
+      `decorative trim frame (surround, pilasters, cornice, sill), not the glass or ` +
+      `what is behind it. Keep the house's own windows and glass from IMAGE 1 unchanged.`;
   } else if (frame) {
     prompt +=
       `\n\nAdd decorative window trim around EVERY window of the house: ${frame.hint}. ` +
