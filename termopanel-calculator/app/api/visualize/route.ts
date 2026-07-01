@@ -16,6 +16,7 @@ interface Body {
   textureId?: string; // id выбранной текстуры
   foundationId?: string | null; // id отделки цоколя (null = без цоколя)
   decorIds?: string[]; // id выбранного декора (мультивыбор)
+  withBrackets?: boolean; // кронштейны: true = с, false = без, undefined = без указания
   comment?: string; // доп. комментарий пользователя
 }
 
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Некорректный запрос." }, { status: 400 });
   }
 
-  const { image, textureId, foundationId, decorIds, comment } = body;
+  const { image, textureId, foundationId, decorIds, withBrackets, comment } = body;
   const mimeType = body.mimeType || "image/jpeg";
 
   if (!image) {
@@ -141,6 +142,19 @@ export async function POST(req: NextRequest) {
     prompt +=
       `\n\nAdd these facade decorative elements: ${decors.map((d) => d.hint).join(", ")}. ` +
       `Render them realistically at natural scale.`;
+  }
+
+  // Кронштейны — две версии рендера (для сравнения)
+  if (withBrackets === false) {
+    prompt +=
+      `\n\nDo NOT add any brackets, corbels or decorative console elements to the facade. ` +
+      `Keep the facade clean without support brackets.`;
+  } else if (withBrackets === true) {
+    prompt +=
+      `\n\nAdd decorative facade brackets (corbels) — small ornamental support consoles — ` +
+      `placed evenly along the top of the walls just under the roofline/cornice, and ` +
+      `beside the corners. Render them realistic, symmetric, matching a classic ` +
+      `travertine decor style, natural scale. This is an intended decorative addition.`;
   }
 
   // Доп. инструкции пользователя

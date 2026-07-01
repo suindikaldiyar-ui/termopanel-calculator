@@ -22,7 +22,10 @@ export default function Visualizer({
   const [source, setSource] = useState<CompressedImage | null>(null);
   const [texture, setTexture] = useState<Texture>(TEXTURES[0]);
   const [comment, setComment] = useState("");
-  const [result, setResult] = useState<string | null>(null); // data url «ПОСЛЕ»
+  const [compareBrackets, setCompareBrackets] = useState(false);
+  const [result, setResult] = useState<string | null>(null); // data url «ПОСЛЕ» (обычный режим)
+  const [resultNo, setResultNo] = useState<string | null>(null); // без кронштейнов
+  const [resultYes, setResultYes] = useState<string | null>(null); // с кронштейнами
   const [beforeUrl, setBeforeUrl] = useState<string | null>(null); // data url «ДО»
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +49,8 @@ export default function Visualizer({
     }
     setError(null);
     setResult(null);
+    setResultNo(null);
+    setResultYes(null);
     try {
       const compressed = await compressImage(file);
       setSource(compressed);
@@ -54,30 +59,48 @@ export default function Visualizer({
     }
   }
 
+  // Один запрос к Gemini → data url результата
+  async function requestRender(withBrackets?: boolean): Promise<string> {
+    const res = await fetch("/api/visualize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        image: source!.base64,
+        mimeType: source!.mimeType,
+        textureId: texture.id,
+        foundationId,
+        decorIds,
+        withBrackets,
+        comment: comment.trim(),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || "Ошибка генерации.");
+    return `data:${data.mimeType || "image/png"};base64,${data.image}`;
+  }
+
   async function generate() {
     if (!source) return;
     setLoading(true);
     setError(null);
     setResult(null);
+    setResultNo(null);
+    setResultYes(null);
     try {
-      const res = await fetch("/api/visualize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image: source.base64,
-          mimeType: source.mimeType,
-          textureId: texture.id,
-          foundationId,
-          decorIds,
-          comment: comment.trim(),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data?.error || "Ошибка генерации.");
+      if (compareBrackets) {
+        // Две версии одного дома: без и с кронштейнами
+        const [no, yes] = await Promise.all([
+          requestRender(false),
+          requestRender(true),
+        ]);
+        setBeforeUrl(source.dataUrl);
+        setResultNo(no);
+        setResultYes(yes);
+      } else {
+        const r = await requestRender();
+        setBeforeUrl(source.dataUrl);
+        setResult(r);
       }
-      setBeforeUrl(source.dataUrl); // фиксируем «ДО» на момент генерации
-      setResult(`data:${data.mimeType || "image/png"};base64,${data.image}`);
     } catch (e: any) {
       setError(e?.message || "Не удалось сгенерировать визуализацию.");
     } finally {
@@ -85,12 +108,15 @@ export default function Visualizer({
     }
   }
 
-  function download() {
-    if (!result) return;
+  function downloadUrl(url: string, name: string) {
     const a = document.createElement("a");
-    a.href = result;
-    a.download = `termopanel-${texture.id}.png`;
+    a.href = url;
+    a.download = name;
     a.click();
+  }
+
+  function download() {
+    if (result) downloadUrl(result, `termopanel-${texture.id}.png`);
   }
 
   // Загрузка картинки из data url в HTMLImageElement
@@ -103,20 +129,22 @@ export default function Visualizer({
     });
   }
 
-  // Склейка ДО/ПОСЛЕ в одну картинку через canvas
-  async function downloadBoth() {
-    if (!beforeUrl || !result) return;
+  // Склейка двух картинок в одну (рядом, с подписями) через canvas
+  async function mergeSideBySide(
+    urlA: string,
+    labelA: string,
+    urlB: string,
+    labelB: string,
+    filename: string
+  ) {
     try {
-      const [before, after] = await Promise.all([
-        loadImg(beforeUrl),
-        loadImg(result),
-      ]);
+      const [a, b] = await Promise.all([loadImg(urlA), loadImg(urlB)]);
 
       const H = 800; // общая высота
       const GAP = 6; // белая полоса-разделитель
-      const wBefore = Math.round((before.width / before.height) * H);
-      const wAfter = Math.round((after.width / after.height) * H);
-      const W = wBefore + GAP + wAfter;
+      const wA = Math.round((a.width / a.height) * H);
+      const wB = Math.round((b.width / b.height) * H);
+      const W = wA + GAP + wB;
 
       const canvas = document.createElement("canvas");
       canvas.width = W;
@@ -124,25 +152,34 @@ export default function Visualizer({
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      // фон-разделитель
       ctx.fillStyle = "#FFFFFF";
       ctx.fillRect(0, 0, W, H);
+      ctx.drawImage(a, 0, 0, wA, H);
+      ctx.drawImage(b, wA + GAP, 0, wB, H);
 
-      ctx.drawImage(before, 0, 0, wBefore, H);
-      ctx.drawImage(after, wBefore + GAP, 0, wAfter, H);
+      drawLabel(ctx, labelA, 0, H);
+      drawLabel(ctx, labelB, wA + GAP, H);
 
-      // подписи внизу
-      drawLabel(ctx, "ДО", 0, H);
-      drawLabel(ctx, "ПОСЛЕ", wBefore + GAP, H);
-
-      const url = canvas.toDataURL("image/jpeg", 0.9);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "termopanel-do-posle.jpg";
-      a.click();
+      downloadUrl(canvas.toDataURL("image/jpeg", 0.9), filename);
     } catch (e: any) {
-      setError(e?.message || "Не удалось собрать изображение ДО/ПОСЛЕ.");
+      setError(e?.message || "Не удалось собрать сравнение.");
     }
+  }
+
+  function downloadBoth() {
+    if (beforeUrl && result)
+      mergeSideBySide(beforeUrl, "ДО", result, "ПОСЛЕ", "termopanel-do-posle.jpg");
+  }
+
+  function downloadComparison() {
+    if (resultNo && resultYes)
+      mergeSideBySide(
+        resultNo,
+        "Без кронштейнов",
+        resultYes,
+        "С кронштейнами",
+        "termopanel-brackets.jpg"
+      );
   }
 
   // Плашка с подписью в левом нижнем углу панели, начинающейся с offsetX
@@ -432,6 +469,27 @@ export default function Visualizer({
             />
           </div>
 
+          {/* Сравнение: без / с кронштейнами */}
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-line bg-canvas/50 p-3">
+            <input
+              type="checkbox"
+              checked={compareBrackets}
+              onChange={(e) => {
+                setCompareBrackets(e.target.checked);
+                setResult(null);
+                setResultNo(null);
+                setResultYes(null);
+              }}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-gold"
+            />
+            <span className="text-xs leading-snug text-ink">
+              <span className="font-semibold">Сравнить кронштейны</span>
+              <span className="block text-muted">
+                две версии: без и с кронштейнами
+              </span>
+            </span>
+          </label>
+
           <button
             type="button"
             onClick={generate}
@@ -441,7 +499,7 @@ export default function Visualizer({
             {loading ? (
               <>
                 <Spinner />
-                Генерация…
+                {compareBrackets ? "Генерация 2 версий…" : "Генерация…"}
               </>
             ) : (
               <>✨ Визуализировать</>
@@ -460,7 +518,78 @@ export default function Visualizer({
           {loading ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 text-ink/50">
               <Spinner large />
-              <p className="text-sm">Подбираем травертин «{texture.name}»…</p>
+              <p className="text-sm">
+                {compareBrackets
+                  ? "Генерируем две версии фасада…"
+                  : `Подбираем травертин «${texture.name}»…`}
+              </p>
+            </div>
+          ) : resultNo && resultYes ? (
+            <div className="flex flex-1 flex-col gap-3">
+              {/* ДО сверху */}
+              {beforeUrl && (
+                <div className="relative overflow-hidden rounded-lg">
+                  <img
+                    src={beforeUrl}
+                    alt="До"
+                    className="max-h-48 w-full rounded-lg object-contain"
+                  />
+                  <span className="absolute bottom-2 left-2 rounded-md bg-black/55 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
+                    До
+                  </span>
+                </div>
+              )}
+              {/* Две версии рендера рядом */}
+              <div className="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="relative overflow-hidden rounded-lg">
+                  <img
+                    src={resultNo}
+                    alt="Без кронштейнов"
+                    className="h-full w-full rounded-lg object-contain"
+                  />
+                  <span className="absolute bottom-2 left-2 rounded-md bg-black/55 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
+                    Без кронштейнов
+                  </span>
+                </div>
+                <div className="relative overflow-hidden rounded-lg">
+                  <img
+                    src={resultYes}
+                    alt="С кронштейнами"
+                    className="h-full w-full rounded-lg object-contain"
+                  />
+                  <span className="absolute bottom-2 left-2 rounded-md bg-black/55 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
+                    С кронштейнами
+                  </span>
+                </div>
+              </div>
+              {/* Кнопки скачивания */}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => downloadUrl(resultNo, "termopanel-no-brackets.png")}
+                  className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-ink transition hover:border-terracotta hover:text-terracotta"
+                >
+                  <DownloadIcon /> Без кронштейнов
+                </button>
+                <button
+                  type="button"
+                  onClick={() => downloadUrl(resultYes, "termopanel-with-brackets.png")}
+                  className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-ink transition hover:border-terracotta hover:text-terracotta"
+                >
+                  <DownloadIcon /> С кронштейнами
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadComparison}
+                  className="inline-flex items-center gap-2 rounded-lg bg-stone px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-stone/90"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="5" width="7" height="14" rx="1" />
+                    <rect x="14" y="5" width="7" height="14" rx="1" />
+                  </svg>
+                  Скачать сравнение
+                </button>
+              </div>
             </div>
           ) : result ? (
             <div className="flex flex-1 flex-col">
@@ -528,6 +657,16 @@ export default function Visualizer({
         </div>
       </div>
     </section>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="m7 10 5 5 5-5" />
+      <path d="M12 15V3" />
+    </svg>
   );
 }
 
