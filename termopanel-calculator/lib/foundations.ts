@@ -1,27 +1,19 @@
-// Каталог отделки цоколя/фундамента для AI-визуализации
-export type Foundation = { id: string; name: string; swatch: string; hint: string };
+// Каталог отделки цоколя/фундамента. Влияет на визуализацию и смету.
+// Пока пусто — записи добавляются одной строкой в массив ниже.
+export type FoundationItem = {
+  id: string;
+  name: string;
+  image: string; // "/foundations/{id}.jpg" — превью (пока файлов нет → fallback swatch)
+  swatch: string; // запасной цвет, если картинки нет
+  hint: string; // подсказка для Gemini, напр. "dark charcoal brick-look stone"
+  pricePerM: number; // цена за погонный метр цоколя, тг
+};
 
-export const FOUNDATIONS: Foundation[] = [
-  { id: "none", name: "Без цоколя", swatch: "#EDEDED", hint: "" },
-  {
-    id: "graphite",
-    name: "Графитовый кирпич",
-    swatch: "#3A3A3D",
-    hint: "dark charcoal-grey brick-look stone",
-  },
-  {
-    id: "grey",
-    name: "Серый камень",
-    swatch: "#6E6A66",
-    hint: "grey natural split-face stone",
-  },
-  {
-    id: "beige",
-    name: "Бежевый камень",
-    swatch: "#A89578",
-    hint: "warm beige stone matching the facade",
-  },
+export const FOUNDATIONS: FoundationItem[] = [
+  // пусто — заполню позже. Пример формата:
+  // { id: "graphite", name: "Графит кирпич", image: "/foundations/graphite.jpg",
+  //   swatch: "#3A3A3D", hint: "dark charcoal brick-look stone", pricePerM: 4000 },
 ];
 
-export const getFoundation = (id?: string) =>
-  FOUNDATIONS.find((f) => f.id === id) ?? FOUNDATIONS[0];
+export const getFoundation = (id?: string | null) =>
+  id ? FOUNDATIONS.find((f) => f.id === id) : undefined;

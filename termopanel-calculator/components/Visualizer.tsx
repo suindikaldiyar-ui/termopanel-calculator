@@ -2,13 +2,25 @@
 
 import { useRef, useState } from "react";
 import { TEXTURES, type Texture } from "@/lib/textures";
-import { FOUNDATIONS, type Foundation } from "@/lib/foundations";
+import { FOUNDATIONS } from "@/lib/foundations";
+import { DECOR, DECOR_CATEGORY_LABEL } from "@/lib/decor";
 import { compressImage, type CompressedImage } from "@/lib/image";
 
-export default function Visualizer() {
+interface Props {
+  foundationId: string | null;
+  decorIds: string[];
+  onFoundationId: (id: string | null) => void;
+  onDecorIds: (ids: string[]) => void;
+}
+
+export default function Visualizer({
+  foundationId,
+  decorIds,
+  onFoundationId,
+  onDecorIds,
+}: Props) {
   const [source, setSource] = useState<CompressedImage | null>(null);
   const [texture, setTexture] = useState<Texture>(TEXTURES[0]);
-  const [foundation, setFoundation] = useState<Foundation>(FOUNDATIONS[0]);
   const [comment, setComment] = useState("");
   const [result, setResult] = useState<string | null>(null); // data url «ПОСЛЕ»
   const [beforeUrl, setBeforeUrl] = useState<string | null>(null); // data url «ДО»
@@ -16,7 +28,15 @@ export default function Visualizer() {
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [failedTextures, setFailedTextures] = useState<Record<string, boolean>>({});
+  const [failedImg, setFailedImg] = useState<Record<string, boolean>>({});
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const toggleDecor = (id: string) =>
+    onDecorIds(
+      decorIds.includes(id)
+        ? decorIds.filter((x) => x !== id)
+        : [...decorIds, id]
+    );
 
   async function handleFile(file: File | undefined | null) {
     if (!file) return;
@@ -47,7 +67,8 @@ export default function Visualizer() {
           image: source.base64,
           mimeType: source.mimeType,
           textureId: texture.id,
-          foundationId: foundation.id,
+          foundationId,
+          decorIds,
           comment: comment.trim(),
         }),
       });
@@ -271,27 +292,60 @@ export default function Visualizer() {
             </div>
           </div>
 
-          {/* Выбор цоколя */}
+          {/* Выбор цоколя / фундамента */}
           <div>
-            <p className="mb-2 text-sm font-semibold text-ink">Цоколь</p>
+            <p className="mb-2 text-sm font-semibold text-ink">Цоколь / фундамент</p>
             <div className="grid grid-cols-2 gap-2">
+              {/* «Без цоколя» — всегда */}
+              <button
+                type="button"
+                onClick={() => onFoundationId(null)}
+                className={`flex items-center gap-2 rounded-xl border p-2 text-left transition ${
+                  foundationId === null
+                    ? "border-gold ring-2 ring-gold/30"
+                    : "border-line hover:border-gold/40"
+                }`}
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-line text-muted">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="m5 5 14 14" />
+                  </svg>
+                </span>
+                <span className="text-xs font-medium leading-tight text-ink">
+                  Без цоколя
+                </span>
+              </button>
+
               {FOUNDATIONS.map((f) => {
-                const active = f.id === foundation.id;
+                const active = f.id === foundationId;
                 return (
                   <button
                     key={f.id}
                     type="button"
-                    onClick={() => setFoundation(f)}
+                    onClick={() => onFoundationId(f.id)}
                     className={`flex items-center gap-2 rounded-xl border p-2 text-left transition ${
                       active
-                        ? "border-terracotta ring-2 ring-terracotta/20"
-                        : "border-line hover:border-terracotta/40"
+                        ? "border-gold ring-2 ring-gold/30"
+                        : "border-line hover:border-gold/40"
                     }`}
                   >
-                    <span
-                      className="h-7 w-7 shrink-0 rounded-full border border-black/10"
-                      style={{ background: f.swatch }}
-                    />
+                    {failedImg[f.image] ? (
+                      <span
+                        className="h-8 w-8 shrink-0 rounded-lg border border-black/10"
+                        style={{ background: f.swatch }}
+                      />
+                    ) : (
+                      <img
+                        src={f.image}
+                        alt={f.name}
+                        loading="lazy"
+                        onError={() =>
+                          setFailedImg((p) => ({ ...p, [f.image]: true }))
+                        }
+                        className="h-8 w-8 shrink-0 rounded-lg border border-black/10 object-cover"
+                      />
+                    )}
                     <span className="text-xs font-medium leading-tight text-ink">
                       {f.name}
                     </span>
@@ -299,6 +353,68 @@ export default function Visualizer() {
                 );
               })}
             </div>
+            {FOUNDATIONS.length === 0 && <ComingSoon />}
+          </div>
+
+          {/* Выбор декора (мультивыбор) */}
+          <div>
+            <p className="mb-2 text-sm font-semibold text-ink">
+              Декор{" "}
+              <span className="font-normal text-muted">(можно несколько)</span>
+            </p>
+            {DECOR.length === 0 ? (
+              <ComingSoon />
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {DECOR.map((d) => {
+                  const active = decorIds.includes(d.id);
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => toggleDecor(d.id)}
+                      className={`relative flex items-center gap-2 rounded-xl border p-2 text-left transition ${
+                        active
+                          ? "border-gold ring-2 ring-gold/30"
+                          : "border-line hover:border-gold/40"
+                      }`}
+                    >
+                      {failedImg[d.image] ? (
+                        <span
+                          className="h-8 w-8 shrink-0 rounded-lg border border-black/10"
+                          style={{ background: d.swatch }}
+                        />
+                      ) : (
+                        <img
+                          src={d.image}
+                          alt={d.name}
+                          loading="lazy"
+                          onError={() =>
+                            setFailedImg((p) => ({ ...p, [d.image]: true }))
+                          }
+                          className="h-8 w-8 shrink-0 rounded-lg border border-black/10 object-cover"
+                        />
+                      )}
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-medium leading-tight text-ink">
+                          {d.name}
+                        </span>
+                        <span className="block text-[10px] text-muted">
+                          {DECOR_CATEGORY_LABEL[d.category]}
+                        </span>
+                      </span>
+                      {active && (
+                        <span className="absolute right-1.5 top-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-gold text-stone">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                            <path d="M20 6 9 17l-5-5" />
+                          </svg>
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Комментарий */}
@@ -412,6 +528,20 @@ export default function Visualizer() {
         </div>
       </div>
     </section>
+  );
+}
+
+function ComingSoon() {
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-line bg-canvas/50 px-3 py-3">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-gold">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </svg>
+      <span className="text-xs font-medium text-muted">
+        Скоро — материалы добавляются
+      </span>
+    </div>
   );
 }
 

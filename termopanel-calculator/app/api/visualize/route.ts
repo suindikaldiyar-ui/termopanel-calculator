@@ -3,6 +3,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { TEXTURES } from "@/lib/textures";
 import { getFoundation } from "@/lib/foundations";
+import { getDecor, type DecorItem } from "@/lib/decor";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -13,7 +14,8 @@ interface Body {
   image?: string; // фото дома, base64 (без префикса data:)
   mimeType?: string; // напр. image/jpeg
   textureId?: string; // id выбранной текстуры
-  foundationId?: string; // id отделки цоколя
+  foundationId?: string | null; // id отделки цоколя (null = без цоколя)
+  decorIds?: string[]; // id выбранного декора (мультивыбор)
   comment?: string; // доп. комментарий пользователя
 }
 
@@ -75,7 +77,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Некорректный запрос." }, { status: 400 });
   }
 
-  const { image, textureId, foundationId, comment } = body;
+  const { image, textureId, foundationId, decorIds, comment } = body;
   const mimeType = body.mimeType || "image/jpeg";
 
   if (!image) {
@@ -108,6 +110,9 @@ export async function POST(req: NextRequest) {
   }
 
   const foundation = getFoundation(foundationId);
+  const decors = (decorIds ?? [])
+    .map(getDecor)
+    .filter((d): d is DecorItem => Boolean(d));
   const userComment = (comment || "").trim();
 
   // Строгий промпт: цвет и рисунок берём СТРОГО из IMAGE 2.
@@ -124,11 +129,18 @@ export async function POST(req: NextRequest) {
     `the veranda/porch structure, railings, stairs, roof, sky, ground, plants and ` +
     `background. Same camera angle. Photorealistic, natural daylight, high quality.`;
 
-  // Цоколь — разрешённое исключение (если выбран не "Без цоколя")
-  if (foundation.hint) {
+  // Цоколь — разрешённое добавление (только если выбран)
+  if (foundation?.hint) {
     prompt +=
-      `\n\nAlso clad the base/plinth along the bottom of the walls (about 0.4-0.5 m high) ` +
-      `in ${foundation.hint}, with a crisp clean top edge. This plinth is an intended addition.`;
+      `\n\nAlso clad the base/plinth (about 0.4-0.5 m high) along the bottom of the ` +
+      `walls in ${foundation.hint}, with a crisp clean top edge. This plinth is an intended addition.`;
+  }
+
+  // Декор — разрешённое добавление (мультивыбор)
+  if (decors.length) {
+    prompt +=
+      `\n\nAdd these facade decorative elements: ${decors.map((d) => d.hint).join(", ")}. ` +
+      `Render them realistically at natural scale.`;
   }
 
   // Доп. инструкции пользователя

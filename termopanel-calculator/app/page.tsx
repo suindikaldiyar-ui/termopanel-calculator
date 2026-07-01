@@ -23,7 +23,14 @@ export default function Page() {
   const [inputs, setInputs] = useState<CalcInputs>(INITIAL_INPUTS);
   const [prices, setPrices] = useState<Prices>(DEFAULT_PRICES);
 
-  const estimate = useMemo(() => calculate(inputs, prices), [inputs, prices]);
+  // Один общий выбор для сметы И визуализатора
+  const [foundationId, setFoundationId] = useState<string | null>(null);
+  const [decorIds, setDecorIds] = useState<string[]>([]);
+
+  const estimate = useMemo(
+    () => calculate(inputs, prices, foundationId, decorIds),
+    [inputs, prices, foundationId, decorIds]
+  );
 
   return (
     <main className="min-h-screen">
@@ -71,7 +78,12 @@ export default function Page() {
         <ClientKP estimate={estimate} area={inputs.area} />
 
         {/* Полноширинная AI-визуализация */}
-        <Visualizer />
+        <Visualizer
+          foundationId={foundationId}
+          decorIds={decorIds}
+          onFoundationId={setFoundationId}
+          onDecorIds={setDecorIds}
+        />
 
         <footer className="pb-6 pt-2 text-center text-xs text-muted/60">
           Pitch-MVP · расчёт ориентировочный, уточняется при замере

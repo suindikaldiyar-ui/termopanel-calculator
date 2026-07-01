@@ -1,6 +1,8 @@
 // ──────────────────────────────────────────
 // Расчёт сметы термопанельного фасада
 // ──────────────────────────────────────────
+import { getFoundation } from "./foundations";
+import { getDecor, type DecorItem } from "./decor";
 
 // Нормы расхода (ЗАФИКСИРОВАНЫ — не менять)
 export const NORMS = {
@@ -9,10 +11,28 @@ export const NORMS = {
   LACQUER_M2_PER_CAN: 66, // 10кг = 66 м²
   LACQUER_KG_PER_CAN: 10,
   FRAMING_M_PER_WINDOW: 8, // 1 окно = 8 м (верх + низ + 2 стороны)
+  PILASTER_M_PER_CORNER: 3, // высота пилястры (упрощённо), м
   PANEL_PRICE: 3200, // термопанель, тг/м² (задано)
   FOUNDATION_PAINT_HEIGHT: 0.4, // высота окраски цоколя, м
   PAINT_L_PER_UNIT: 10, // 1 единица краски = 10 л покрытия (м² × высота)
 } as const;
+
+// Метраж декора по категории
+function decorMeters(
+  category: DecorItem["category"],
+  windows: number,
+  corners: number,
+  perimeter: number
+): number {
+  switch (category) {
+    case "obramlenie":
+      return windows * NORMS.FRAMING_M_PER_WINDOW; // окна × 8
+    case "pilyastra":
+      return corners * NORMS.PILASTER_M_PER_CORNER; // углы × 3
+    case "karniz":
+      return perimeter; // периметр
+  }
+}
 
 // Входные параметры калькулятора
 export interface CalcInputs {
@@ -64,7 +84,12 @@ export interface Estimate {
 const ceil = (n: number) => Math.ceil(n);
 const round = (n: number) => Math.round(n);
 
-export function calculate(inputs: CalcInputs, prices: Prices): Estimate {
+export function calculate(
+  inputs: CalcInputs,
+  prices: Prices,
+  foundationId?: string | null,
+  decorIds?: string[]
+): Estimate {
   const area = Math.max(0, inputs.area || 0);
   const windows = Math.max(0, inputs.windows || 0);
   const corners = Math.max(0, inputs.corners || 0);
@@ -116,7 +141,7 @@ export function calculate(inputs: CalcInputs, prices: Prices): Estimate {
     total: lacquerCans * prices.lacquerPerCan,
   });
 
-  // 5. Обрамление = окна × 8 м
+  // 5. Обрамление = окна × 8 м (БАЗОВАЯ строка — остаётся всегда)
   const framingMeters = windows * NORMS.FRAMING_M_PER_WINDOW;
   items.push({
     key: "framing",
@@ -126,6 +151,22 @@ export function calculate(inputs: CalcInputs, prices: Prices): Estimate {
     unitPrice: prices.framingPerMeter,
     total: round(framingMeters * prices.framingPerMeter),
   });
+
+  // 5.1 Декор (мультивыбор) — отдельная строка за каждый выбранный элемент.
+  //     Пока каталог пуст / ничего не выбрано → строк нет, смета не меняется.
+  for (const id of decorIds ?? []) {
+    const decor = getDecor(id);
+    if (!decor) continue;
+    const meters = decorMeters(decor.category, windows, corners, perimeter);
+    items.push({
+      key: `decor-${decor.id}`,
+      name: decor.name,
+      detail: `${fmtNum(meters)} м`,
+      unitLabel: "тг/м",
+      unitPrice: decor.pricePerM,
+      total: round(meters * decor.pricePerM),
+    });
+  }
 
   // 6. Углы = кол-во углов
   items.push({
@@ -137,14 +178,18 @@ export function calculate(inputs: CalcInputs, prices: Prices): Estimate {
     total: corners * prices.cornerPerUnit,
   });
 
-  // 7. Фундамент = периметр × цена/метр
+  // 7. Фундамент = периметр × цена/метр.
+  //    Выбран цоколь из каталога → его имя и цена; иначе — прежнее поведение.
+  const foundation = getFoundation(foundationId);
   items.push({
     key: "foundation",
-    name: "Фундамент (отделка)",
+    name: foundation ? `Цоколь: ${foundation.name}` : "Фундамент (отделка)",
     detail: `${fmtNum(perimeter)} м`,
     unitLabel: "тг/м",
-    unitPrice: prices.foundationPerMeter,
-    total: round(perimeter * prices.foundationPerMeter),
+    unitPrice: foundation ? foundation.pricePerM : prices.foundationPerMeter,
+    total: round(
+      perimeter * (foundation ? foundation.pricePerM : prices.foundationPerMeter)
+    ),
   });
 
   // 8. Краска (фундамент) = (периметр × 0.4) ÷ 10 = литров
