@@ -27,22 +27,22 @@ export default function Page() {
   return (
     <main className="min-h-screen">
       {/* Header */}
-      <header className="bg-stone text-white">
+      <header className="border-b border-line bg-stone text-ink">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-terracotta text-lg font-black">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-gold to-goldLight text-lg font-black text-stone shadow-gold">
               Т
             </span>
             <div>
               <h1 className="text-lg font-extrabold leading-tight tracking-tight">
                 Термопанель
               </h1>
-              <p className="text-xs text-white/50">
+              <p className="text-xs text-muted">
                 Калькулятор фасада · AI-визуализация
               </p>
             </div>
           </div>
-          <span className="hidden rounded-full border border-white/15 px-3 py-1 text-xs text-white/60 sm:block">
+          <span className="hidden rounded-full border border-gold/40 px-3 py-1 text-xs text-gold sm:block">
             Травертин · фасадные термопанели
           </span>
         </div>
@@ -64,7 +64,7 @@ export default function Page() {
         {/* Полноширинная AI-визуализация */}
         <Visualizer />
 
-        <footer className="pb-6 pt-2 text-center text-xs text-ink/30">
+        <footer className="pb-6 pt-2 text-center text-xs text-muted/60">
           Pitch-MVP · расчёт ориентировочный, уточняется при замере
         </footer>
       </div>

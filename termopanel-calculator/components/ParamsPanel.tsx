@@ -26,26 +26,35 @@ export default function ParamsPanel({
   onResetPrices,
 }: Props) {
   return (
-    <div className="rounded-2xl bg-surface p-5 shadow-card">
-      <h2 className="mb-4 text-base font-bold text-ink">Параметры объекта</h2>
+    <div className="rounded-2xl border border-line bg-surface p-5 shadow-card sm:p-6">
+      <h2 className="mb-5 flex items-center gap-2.5 text-lg font-bold text-ink">
+        <span className="h-5 w-1 rounded-full bg-gradient-to-b from-gold to-goldLight" />
+        Параметры объекта
+      </h2>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {NUM_FIELDS.map((f) => (
           <label key={f.key} className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-ink/70">{f.label}</span>
+            <span className="text-sm font-medium text-muted">{f.label}</span>
             <div className="relative">
               <input
                 type="number"
+                inputMode="decimal"
                 min={0}
                 step={f.step}
-                value={inputs[f.key] === 0 ? "" : inputs[f.key]}
-                placeholder="0"
-                onChange={(e) =>
-                  onInputs({ ...inputs, [f.key]: Number(e.target.value) || 0 })
+                value={
+                  Number.isFinite(inputs[f.key]) && inputs[f.key] !== 0
+                    ? inputs[f.key]
+                    : ""
                 }
-                className="tnum w-full rounded-xl border border-line bg-canvas/50 px-3.5 py-2.5 pr-12 text-base font-semibold text-ink outline-none transition focus:border-terracotta focus:bg-surface"
+                placeholder="0"
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  onInputs({ ...inputs, [f.key]: Number.isFinite(n) ? n : 0 });
+                }}
+                className="tnum w-full rounded-xl border border-line bg-canvas px-3.5 py-2.5 pr-12 text-base font-semibold text-ink outline-none transition placeholder:text-muted/40 focus:border-gold focus:ring-2 focus:ring-gold/30"
               />
-              <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-ink/40">
+              <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-muted">
                 {f.suffix}
               </span>
             </div>

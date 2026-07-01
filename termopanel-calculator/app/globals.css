@@ -8,8 +8,8 @@
 
 html,
 body {
-  background-color: #f7f4ef;
-  color: #1f1b16;
+  background-color: #14110e;
+  color: #f2ede3;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -29,16 +29,33 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
-/* Печать сметы */
+/* ── Печать сметы: ИНВЕРСИЯ под бумагу (белый фон, тёмный текст) ── */
 @media print {
+  html,
   body {
-    background: #fff;
+    background: #ffffff !important;
+    color: #14110e !important;
   }
   .no-print {
     display: none !important;
   }
+  /* карточка сметы */
   .print-block {
+    background: #ffffff !important;
     box-shadow: none !important;
-    border: 1px solid #e8e1d6 !important;
+    border: 1px solid #d8cfbe !important;
+  }
+  /* все тексты — тёмные */
+  .print-block * {
+    color: #14110e !important;
+    border-color: #d8cfbe !important;
+  }
+  /* «Итого» — рамка вместо золотой заливки */
+  .print-total {
+    background: #ffffff !important;
+    border: 2px solid #c9a24b !important;
+  }
+  .print-total * {
+    color: #14110e !important;
   }
 }
