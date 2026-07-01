@@ -52,6 +52,26 @@ export default function EstimatePanel({ estimate }: Props) {
         <div className="mt-3 h-px w-full bg-gradient-to-r from-gold/70 via-gold/25 to-transparent" />
       </div>
 
+      {/* Разбивка по стенам (для менеджера, не печатается) */}
+      {estimate.wallAreas.length > 0 && (
+        <div className="no-print mx-5 mt-3 rounded-xl border border-line bg-canvas px-3 py-2.5 text-xs sm:mx-6">
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {estimate.wallAreas.map((a, i) => (
+              <span key={i} className="text-muted">
+                Стена {i + 1} —{" "}
+                <span className="tnum font-semibold text-ink">{fmtNum(a)} м²</span>
+              </span>
+            ))}
+            <span className="text-muted">
+              Окна/двери —{" "}
+              <span className="tnum font-semibold text-goldLight">
+                −{fmtNum(estimate.openingsArea)} м²
+              </span>
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Строки сметы */}
       <div className="flex-1 divide-y divide-line px-5 sm:px-6">
         {estimate.items.map((it) => (

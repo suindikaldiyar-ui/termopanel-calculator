@@ -13,13 +13,15 @@ import ClientKP from "@/components/ClientKP";
 import Visualizer from "@/components/Visualizer";
 
 const INITIAL_INPUTS: CalcInputs = {
-  length: 20,
-  width: 12,
-  wallHeight: 3,
-  windowsArea: 15,
+  wallList: [
+    { height: 3.4, length: 9 },
+    { height: 3.4, length: 8.5 },
+    { height: 3.4, length: 9 },
+    { height: 3.4, length: 8.69 },
+  ],
+  openingList: Array.from({ length: 8 }, () => ({ width: 1.5, height: 1.5 })),
   foundationHeight: 0.8,
   corners: 4,
-  windows: 8,
 };
 
 export default function Page() {

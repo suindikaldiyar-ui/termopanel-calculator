@@ -14,15 +14,24 @@ export const NORMS = {
   PILASTER_M_PER_CORNER: 3, // высота пилястры (упрощённо), м
 } as const;
 
+// Стена: высота × длина
+export interface WallItem {
+  height: number;
+  length: number;
+}
+
+// Окно/дверь: ширина × высота
+export interface OpeningItem {
+  width: number;
+  height: number;
+}
+
 // Входные параметры калькулятора
 export interface CalcInputs {
-  length: number; // длина дома, м
-  width: number; // ширина дома, м
-  wallHeight: number; // высота стен, м
-  windowsArea: number; // площадь окон, всего, м² (вычитается из стен)
+  wallList: WallItem[]; // стены — каждая вводится отдельно
+  openingList: OpeningItem[]; // окна/двери — каждое отдельно
   foundationHeight: number; // высота фундамента, м (утепление 3 см)
   corners: number; // количество углов, шт
-  windows: number; // количество окон, шт (для обрамления)
 }
 
 // Цены — редактируемые в UI ("Настройка цен")
@@ -66,8 +75,11 @@ export interface Estimate {
   panelArea: number; // чистая площадь термопанели (стены − окна)
   foundationArea: number; // площадь фундамента
   totalArea: number; // общая площадь = panelArea + foundationArea
-  perimeter: number; // периметр, м
+  perimeter: number; // периметр, м (сумма длин стен)
   wallArea: number; // площадь стен (до вычета окон)
+  openingsArea: number; // площадь окон/дверей
+  wallAreas: number[]; // площадь каждой стены (разбивка)
+  openingsCount: number; // кол-во окон/дверей (для обрамления)
 }
 
 const ceil = (n: number) => Math.ceil(n);
@@ -96,18 +108,28 @@ export function calculate(
   foundationId?: string | null,
   decorIds?: string[]
 ): Estimate {
-  const length = Math.max(0, inputs.length || 0);
-  const width = Math.max(0, inputs.width || 0);
-  const wallHeight = Math.max(0, inputs.wallHeight || 0);
-  const windowsArea = Math.max(0, inputs.windowsArea || 0);
+  const wallList = inputs.wallList ?? [];
+  const openingList = inputs.openingList ?? [];
   const foundationHeight = Math.max(0, inputs.foundationHeight || 0);
   const corners = Math.max(0, inputs.corners || 0);
-  const windows = Math.max(0, inputs.windows || 0);
+  const windows = openingList.length; // кол-во окон = число строк списка
 
-  // Авто-расчёт площадей
-  const perimeter = (length + width) * 2;
-  const wallArea = perimeter * wallHeight;
-  const panelArea = Math.max(0, wallArea - windowsArea);
+  // Площадь каждой стены и суммарная
+  const wallAreas = wallList.map(
+    (w) => Math.max(0, w.height || 0) * Math.max(0, w.length || 0)
+  );
+  const wallArea = wallAreas.reduce((s, a) => s + a, 0);
+
+  // Площадь окон/дверей
+  const openingsArea = openingList.reduce(
+    (s, o) => s + Math.max(0, o.width || 0) * Math.max(0, o.height || 0),
+    0
+  );
+
+  // Периметр фундамента = сумма длин всех стен
+  const perimeter = wallList.reduce((s, w) => s + Math.max(0, w.length || 0), 0);
+
+  const panelArea = Math.max(0, wallArea - openingsArea);
   const foundationArea = perimeter * foundationHeight;
   const totalArea = panelArea + foundationArea;
 
@@ -117,7 +139,7 @@ export function calculate(
   items.push({
     key: "panel",
     name: "Термопанель",
-    detail: `${fmtNum(panelArea)} м² (стены ${fmtNum(wallArea)} − окна ${fmtNum(windowsArea)})`,
+    detail: `${fmtNum(panelArea)} м² (стены ${fmtNum(wallArea)} − окна ${fmtNum(openingsArea)})`,
     unitLabel: "тг/м²",
     unitPrice: prices.termopanelPricePerM2,
     total: round(panelArea * prices.termopanelPricePerM2),
@@ -243,6 +265,9 @@ export function calculate(
     totalArea,
     perimeter,
     wallArea,
+    openingsArea,
+    wallAreas,
+    openingsCount: windows,
   };
 }
 

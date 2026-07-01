@@ -1,6 +1,7 @@
 "use client";
 
-import type { CalcInputs, Prices } from "@/lib/calc";
+import type { CalcInputs, Prices, WallItem, OpeningItem } from "@/lib/calc";
+import { fmtNum } from "@/lib/calc";
 import PriceSettings from "./PriceSettings";
 
 interface Props {
@@ -11,27 +12,69 @@ interface Props {
   onResetPrices: () => void;
 }
 
-const NUM_FIELDS: {
-  key: keyof CalcInputs;
-  label: string;
-  suffix: string;
-  step?: number;
-  hint?: string;
-}[] = [
-  { key: "length", label: "Длина дома", suffix: "м", step: 0.1 },
-  { key: "width", label: "Ширина дома", suffix: "м", step: 0.1 },
-  { key: "wallHeight", label: "Высота стен", suffix: "м", step: 0.1 },
-  { key: "windowsArea", label: "Площадь окон, всего", suffix: "м²", step: 0.1 },
-  {
-    key: "foundationHeight",
-    label: "Высота фундамента",
-    suffix: "м",
-    step: 0.05,
-    hint: "утепление 3 см",
-  },
-  { key: "corners", label: "Количество углов", suffix: "шт", step: 1 },
-  { key: "windows", label: "Количество окон", suffix: "шт", step: 1 },
-];
+// Числовой мини-инпут для строк списков
+function NumCell({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  placeholder?: string;
+}) {
+  return (
+    <input
+      type="number"
+      inputMode="decimal"
+      min={0}
+      step={0.1}
+      value={Number.isFinite(value) && value !== 0 ? value : ""}
+      placeholder={placeholder ?? "0"}
+      onChange={(e) => {
+        const n = Number(e.target.value);
+        onChange(Number.isFinite(n) ? n : 0);
+      }}
+      className="tnum w-full rounded-lg border border-line bg-canvas px-2.5 py-2 text-sm font-semibold text-ink outline-none transition placeholder:text-muted/40 focus:border-gold focus:ring-2 focus:ring-gold/30"
+    />
+  );
+}
+
+function RemoveBtn({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={disabled ? "Нельзя удалить последнюю" : "Удалить"}
+      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line text-muted transition hover:border-red-400/60 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-line disabled:hover:text-muted"
+    >
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M18 6 6 18M6 6l12 12" />
+      </svg>
+    </button>
+  );
+}
+
+function AddBtn({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-gold/50 px-3 py-1.5 text-xs font-bold text-gold transition hover:border-gold hover:bg-gold/10"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+      {label}
+    </button>
+  );
+}
 
 export default function ParamsPanel({
   inputs,
@@ -40,6 +83,45 @@ export default function ParamsPanel({
   onPrices,
   onResetPrices,
 }: Props) {
+  const { wallList, openingList } = inputs;
+
+  // ── Стены ──
+  const setWall = (i: number, patch: Partial<WallItem>) => {
+    const next = wallList.map((w, idx) => (idx === i ? { ...w, ...patch } : w));
+    onInputs({ ...inputs, wallList: next });
+  };
+  const addWall = () =>
+    onInputs({ ...inputs, wallList: [...wallList, { height: 0, length: 0 }] });
+  const removeWall = (i: number) => {
+    if (wallList.length <= 1) return; // минимум 1 стена
+    onInputs({ ...inputs, wallList: wallList.filter((_, idx) => idx !== i) });
+  };
+
+  // ── Окна / двери ──
+  const setOpening = (i: number, patch: Partial<OpeningItem>) => {
+    const next = openingList.map((o, idx) => (idx === i ? { ...o, ...patch } : o));
+    onInputs({ ...inputs, openingList: next });
+  };
+  const addOpening = () =>
+    onInputs({
+      ...inputs,
+      openingList: [...openingList, { width: 1.5, height: 1.5 }],
+    });
+  const removeOpening = (i: number) =>
+    onInputs({
+      ...inputs,
+      openingList: openingList.filter((_, idx) => idx !== i),
+    });
+
+  const wallArea = wallList.reduce(
+    (s, w) => s + (w.height || 0) * (w.length || 0),
+    0
+  );
+  const openingsArea = openingList.reduce(
+    (s, o) => s + (o.width || 0) * (o.height || 0),
+    0
+  );
+
   return (
     <div className="rounded-2xl border border-line bg-surface p-5 shadow-card sm:p-6">
       <h2 className="mb-5 flex items-center gap-2.5 text-lg font-bold text-ink">
@@ -47,39 +129,123 @@ export default function ParamsPanel({
         Параметры объекта
       </h2>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {NUM_FIELDS.map((f) => (
-          <label key={f.key} className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-muted">
-              {f.label}
-              {f.hint && (
-                <span className="ml-1 text-xs text-gold">· {f.hint}</span>
-              )}
-            </span>
-            <div className="relative">
-              <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step={f.step}
-                value={
-                  Number.isFinite(inputs[f.key]) && inputs[f.key] !== 0
-                    ? inputs[f.key]
-                    : ""
-                }
-                placeholder="0"
-                onChange={(e) => {
-                  const n = Number(e.target.value);
-                  onInputs({ ...inputs, [f.key]: Number.isFinite(n) ? n : 0 });
-                }}
-                className="tnum w-full rounded-xl border border-line bg-canvas px-3.5 py-2.5 pr-12 text-base font-semibold text-ink outline-none transition placeholder:text-muted/40 focus:border-gold focus:ring-2 focus:ring-gold/30"
-              />
-              <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-muted">
-                {f.suffix}
-              </span>
+      {/* ── Стены ── */}
+      <div className="mb-5">
+        <div className="mb-2 flex items-baseline justify-between">
+          <span className="text-sm font-semibold text-ink">Стены</span>
+          <span className="tnum text-xs text-muted">
+            Σ {fmtNum(wallArea)} м²
+          </span>
+        </div>
+        <div className="space-y-2">
+          {wallList.map((w, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="w-5 shrink-0 text-xs text-muted">{i + 1}</span>
+              <NumCell value={w.height} onChange={(n) => setWall(i, { height: n })} placeholder="высота" />
+              <span className="text-xs text-muted">×</span>
+              <NumCell value={w.length} onChange={(n) => setWall(i, { length: n })} placeholder="длина" />
+              <RemoveBtn onClick={() => removeWall(i)} disabled={wallList.length <= 1} />
             </div>
-          </label>
-        ))}
+          ))}
+        </div>
+        <div className="mt-1 flex items-center gap-2 pl-7 text-[11px] text-muted">
+          <span className="w-full">высота, м</span>
+          <span className="w-full">длина, м</span>
+          <span className="w-8" />
+        </div>
+        <AddBtn label="Стена" onClick={addWall} />
+      </div>
+
+      {/* ── Окна / двери ── */}
+      <div className="mb-5">
+        <div className="mb-2 flex items-baseline justify-between">
+          <span className="text-sm font-semibold text-ink">
+            Окна / двери{" "}
+            <span className="font-normal text-muted">({openingList.length})</span>
+          </span>
+          <span className="tnum text-xs text-muted">
+            Σ {fmtNum(openingsArea)} м²
+          </span>
+        </div>
+        {openingList.length > 0 && (
+          <div className="space-y-2">
+            {openingList.map((o, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className="w-5 shrink-0 text-xs text-muted">{i + 1}</span>
+                <NumCell value={o.width} onChange={(n) => setOpening(i, { width: n })} placeholder="ширина" />
+                <span className="text-xs text-muted">×</span>
+                <NumCell value={o.height} onChange={(n) => setOpening(i, { height: n })} placeholder="высота" />
+                <RemoveBtn onClick={() => removeOpening(i)} />
+              </div>
+            ))}
+          </div>
+        )}
+        {openingList.length > 0 && (
+          <div className="mt-1 flex items-center gap-2 pl-7 text-[11px] text-muted">
+            <span className="w-full">ширина, м</span>
+            <span className="w-full">высота, м</span>
+            <span className="w-8" />
+          </div>
+        )}
+        <AddBtn label="Окно / дверь" onClick={addOpening} />
+      </div>
+
+      {/* ── Фундамент + углы ── */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-muted">
+            Высота фундамента
+            <span className="ml-1 text-xs text-gold">· утепление 3 см</span>
+          </span>
+          <div className="relative">
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step={0.05}
+              value={
+                Number.isFinite(inputs.foundationHeight) && inputs.foundationHeight !== 0
+                  ? inputs.foundationHeight
+                  : ""
+              }
+              placeholder="0"
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                onInputs({ ...inputs, foundationHeight: Number.isFinite(n) ? n : 0 });
+              }}
+              className="tnum w-full rounded-xl border border-line bg-canvas px-3.5 py-2.5 pr-12 text-base font-semibold text-ink outline-none transition placeholder:text-muted/40 focus:border-gold focus:ring-2 focus:ring-gold/30"
+            />
+            <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-muted">
+              м
+            </span>
+          </div>
+        </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-muted">Количество углов</span>
+          <div className="relative">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              value={
+                Number.isFinite(inputs.corners) && inputs.corners !== 0
+                  ? inputs.corners
+                  : ""
+              }
+              placeholder="0"
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                onInputs({ ...inputs, corners: Number.isFinite(n) ? n : 0 });
+              }}
+              className="tnum w-full rounded-xl border border-line bg-canvas px-3.5 py-2.5 pr-12 text-base font-semibold text-ink outline-none transition placeholder:text-muted/40 focus:border-gold focus:ring-2 focus:ring-gold/30"
+            />
+            <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-muted">
+              шт
+            </span>
+          </div>
+        </label>
       </div>
 
       <div className="mt-4">
