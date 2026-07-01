@@ -12,10 +12,66 @@ export const NORMS = {
   LACQUER_KG_PER_CAN: 10,
   FRAMING_M_PER_WINDOW: 8, // 1 окно = 8 м (верх + низ + 2 стороны)
   PILASTER_M_PER_CORNER: 3, // высота пилястры (упрощённо), м
-  PANEL_PRICE: 3200, // термопанель, тг/м² (задано)
-  FOUNDATION_PAINT_HEIGHT: 0.4, // высота окраски цоколя, м
-  PAINT_L_PER_UNIT: 10, // 1 единица краски = 10 л покрытия (м² × высота)
 } as const;
+
+// Входные параметры калькулятора
+export interface CalcInputs {
+  length: number; // длина дома, м
+  width: number; // ширина дома, м
+  wallHeight: number; // высота стен, м
+  windowsArea: number; // площадь окон, всего, м² (вычитается из стен)
+  foundationHeight: number; // высота фундамента, м (утепление 3 см)
+  corners: number; // количество углов, шт
+  windows: number; // количество окон, шт (для обрамления)
+}
+
+// Цены — редактируемые в UI ("Настройка цен")
+export interface Prices {
+  termopanelPricePerM2: number; // термопанель, тг/м² (дефолт 3200)
+  gluePerBag: number; // клей, тг/мешок
+  travertinePerBucket: number; // травертин, тг/ведро
+  lacquerPerCan: number; // лак, тг/банка (10кг)
+  framingPerMeter: number; // обрамление, тг/м
+  cornerPerUnit: number; // углы, тг/угол
+  foundationMaterialPerM2: number; // фундамент: материал, тг/м²
+  foundationPaintPerM2: number; // фундамент: краска, тг/м²
+}
+
+export const DEFAULT_PRICES: Prices = {
+  termopanelPricePerM2: 3200,
+  gluePerBag: 4500,
+  travertinePerBucket: 9000,
+  lacquerPerCan: 22000,
+  framingPerMeter: 2500,
+  cornerPerUnit: 3500,
+  foundationMaterialPerM2: 3800,
+  foundationPaintPerM2: 1500,
+};
+
+export interface LineItem {
+  key: string;
+  name: string;
+  detail: string; // расход / количество с единицами
+  unitLabel: string; // подпись цены за единицу
+  unitPrice: number;
+  total: number;
+  bonus?: boolean;
+}
+
+export interface Estimate {
+  items: LineItem[];
+  total: number;
+  pricePerM2: number;
+  // Площади (для отображения и КП)
+  panelArea: number; // чистая площадь термопанели (стены − окна)
+  foundationArea: number; // площадь фундамента
+  totalArea: number; // общая площадь = panelArea + foundationArea
+  perimeter: number; // периметр, м
+  wallArea: number; // площадь стен (до вычета окон)
+}
+
+const ceil = (n: number) => Math.ceil(n);
+const round = (n: number) => Math.round(n);
 
 // Метраж декора по категории
 function decorMeters(
@@ -34,81 +90,41 @@ function decorMeters(
   }
 }
 
-// Входные параметры калькулятора
-export interface CalcInputs {
-  area: number; // площадь фасада, м²
-  windows: number; // количество окон, шт
-  corners: number; // количество углов, шт
-  perimeter: number; // периметр фундамента, м
-}
-
-// Цены — редактируемые в UI ("Настройка цен")
-export interface Prices {
-  panel: number; // термопанель, тг/м² (зафиксирована = 3200)
-  gluePerBag: number; // клей, тг/мешок
-  travertinePerBucket: number; // травертин, тг/ведро
-  lacquerPerCan: number; // лак, тг/банка (10кг)
-  framingPerMeter: number; // обрамление, тг/м
-  cornerPerUnit: number; // углы, тг/угол
-  foundationPerMeter: number; // фундамент, тг/м
-  foundationPaintPerLiter: number; // краска цоколя, тг/л
-}
-
-export const DEFAULT_PRICES: Prices = {
-  panel: 3200,
-  gluePerBag: 4500,
-  travertinePerBucket: 9000,
-  lacquerPerCan: 22000,
-  framingPerMeter: 2500,
-  cornerPerUnit: 3500,
-  foundationPerMeter: 4000,
-  foundationPaintPerLiter: 3000,
-};
-
-export interface LineItem {
-  key: string;
-  name: string;
-  detail: string; // расход / количество с единицами
-  unitLabel: string; // подпись цены за единицу
-  unitPrice: number;
-  total: number;
-  bonus?: boolean;
-}
-
-export interface Estimate {
-  items: LineItem[];
-  total: number;
-  pricePerM2: number;
-}
-
-const ceil = (n: number) => Math.ceil(n);
-const round = (n: number) => Math.round(n);
-
 export function calculate(
   inputs: CalcInputs,
   prices: Prices,
   foundationId?: string | null,
   decorIds?: string[]
 ): Estimate {
-  const area = Math.max(0, inputs.area || 0);
-  const windows = Math.max(0, inputs.windows || 0);
+  const length = Math.max(0, inputs.length || 0);
+  const width = Math.max(0, inputs.width || 0);
+  const wallHeight = Math.max(0, inputs.wallHeight || 0);
+  const windowsArea = Math.max(0, inputs.windowsArea || 0);
+  const foundationHeight = Math.max(0, inputs.foundationHeight || 0);
   const corners = Math.max(0, inputs.corners || 0);
-  const perimeter = Math.max(0, inputs.perimeter || 0);
+  const windows = Math.max(0, inputs.windows || 0);
+
+  // Авто-расчёт площадей
+  const perimeter = (length + width) * 2;
+  const wallArea = perimeter * wallHeight;
+  const panelArea = Math.max(0, wallArea - windowsArea);
+  const foundationArea = perimeter * foundationHeight;
+  const totalArea = panelArea + foundationArea;
 
   const items: LineItem[] = [];
 
-  // 1. Термопанель = area × 3200
+  // 1. Термопанель = panelArea × цена (чистая площадь: стены − окна)
   items.push({
     key: "panel",
     name: "Термопанель",
-    detail: `${fmtNum(area)} м²`,
+    detail: `${fmtNum(panelArea)} м² (стены ${fmtNum(wallArea)} − окна ${fmtNum(windowsArea)})`,
     unitLabel: "тг/м²",
-    unitPrice: prices.panel,
-    total: round(area * prices.panel),
+    unitPrice: prices.termopanelPricePerM2,
+    total: round(panelArea * prices.termopanelPricePerM2),
   });
 
-  // 2. Клей = ceil(area / 8) мешков
-  const glueBags = ceil(area / NORMS.GLUE_M2_PER_BAG);
+  // 2. Клей = ceil(panelArea / 8) мешков
+  const glueBags = ceil(panelArea / NORMS.GLUE_M2_PER_BAG);
   items.push({
     key: "glue",
     name: "Клей (25 кг)",
@@ -118,8 +134,8 @@ export function calculate(
     total: glueBags * prices.gluePerBag,
   });
 
-  // 3. Травертин = ceil(area / 10) вёдер
-  const travBuckets = ceil(area / NORMS.TRAVERTINE_M2_PER_BUCKET);
+  // 3. Травертин = ceil(panelArea / 10) вёдер
+  const travBuckets = ceil(panelArea / NORMS.TRAVERTINE_M2_PER_BUCKET);
   items.push({
     key: "travertine",
     name: "Травертин (20 кг / ведро)",
@@ -129,9 +145,9 @@ export function calculate(
     total: travBuckets * prices.travertinePerBucket,
   });
 
-  // 4. Лак = area/66 × 10 кг; ceil(area/66) банок по 10кг
-  const lacquerCans = ceil(area / NORMS.LACQUER_M2_PER_CAN);
-  const lacquerKg = round((area / NORMS.LACQUER_M2_PER_CAN) * NORMS.LACQUER_KG_PER_CAN);
+  // 4. Лак = ceil(panelArea / 66) банок по 10кг
+  const lacquerCans = ceil(panelArea / NORMS.LACQUER_M2_PER_CAN);
+  const lacquerKg = round((panelArea / NORMS.LACQUER_M2_PER_CAN) * NORMS.LACQUER_KG_PER_CAN);
   items.push({
     key: "lacquer",
     name: "Лак (10 кг / банка)",
@@ -153,7 +169,6 @@ export function calculate(
   });
 
   // 5.1 Декор (мультивыбор) — отдельная строка за каждый выбранный элемент.
-  //     Пока каталог пуст / ничего не выбрано → строк нет, смета не меняется.
   for (const id of decorIds ?? []) {
     const decor = getDecor(id);
     if (!decor) continue;
@@ -178,32 +193,34 @@ export function calculate(
     total: corners * prices.cornerPerUnit,
   });
 
-  // 7. Фундамент = периметр × цена/метр.
-  //    Выбран цоколь из каталога → его имя и цена; иначе — прежнее поведение.
+  // 7. Фундамент = foundationArea × (материал + краска).
+  //    Выбран цоколь из каталога → отдельная логика (цена за пог. метр).
   const foundation = getFoundation(foundationId);
-  items.push({
-    key: "foundation",
-    name: foundation ? `Цоколь: ${foundation.name}` : "Фундамент (отделка)",
-    detail: `${fmtNum(perimeter)} м`,
-    unitLabel: "тг/м",
-    unitPrice: foundation ? foundation.pricePerM : prices.foundationPerMeter,
-    total: round(
-      perimeter * (foundation ? foundation.pricePerM : prices.foundationPerMeter)
-    ),
-  });
+  if (foundation) {
+    items.push({
+      key: "foundation",
+      name: `Цоколь: ${foundation.name}`,
+      detail: `${fmtNum(perimeter)} м`,
+      unitLabel: "тг/м",
+      unitPrice: foundation.pricePerM,
+      total: round(perimeter * foundation.pricePerM),
+    });
+  } else {
+    const foundationPerM2 =
+      prices.foundationMaterialPerM2 + prices.foundationPaintPerM2;
+    items.push({
+      key: "foundation",
+      name: "Фундамент",
+      detail:
+        `${fmtNum(foundationArea)} м² (${fmtNum(perimeter)} м × ${fmtNum(foundationHeight)} м) · ` +
+        `(${fmtNum(prices.foundationMaterialPerM2)} + ${fmtNum(prices.foundationPaintPerM2)}) тг/м²`,
+      unitLabel: "тг/м²",
+      unitPrice: foundationPerM2,
+      total: round(foundationArea * foundationPerM2),
+    });
+  }
 
-  // 8. Краска (фундамент) = (периметр × 0.4) ÷ 10 = литров
-  const paintLiters = (perimeter * NORMS.FOUNDATION_PAINT_HEIGHT) / NORMS.PAINT_L_PER_UNIT;
-  items.push({
-    key: "foundationPaint",
-    name: "Краска для цоколя",
-    detail: `${fmtNum(roundTo(paintLiters, 2))} л`,
-    unitLabel: "тг/л",
-    unitPrice: prices.foundationPaintPerLiter,
-    total: round(paintLiters * prices.foundationPaintPerLiter),
-  });
-
-  // 9. Затирка = 🎁 БОНУС, бесплатно
+  // 8. Затирка = 🎁 БОНУС, бесплатно
   items.push({
     key: "grout",
     name: "Затирка",
@@ -215,9 +232,18 @@ export function calculate(
   });
 
   const total = items.reduce((sum, it) => sum + it.total, 0);
-  const pricePerM2 = area > 0 ? round(total / area) : 0;
+  const pricePerM2 = totalArea > 0 ? round(total / totalArea) : 0;
 
-  return { items, total, pricePerM2 };
+  return {
+    items,
+    total,
+    pricePerM2,
+    panelArea,
+    foundationArea,
+    totalArea,
+    perimeter,
+    wallArea,
+  };
 }
 
 // ── Форматирование ──
@@ -227,11 +253,6 @@ export function fmtMoney(n: number): string {
 
 export function fmtNum(n: number): string {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 }).format(n);
-}
-
-function roundTo(n: number, digits: number): number {
-  const f = Math.pow(10, digits);
-  return Math.round(n * f) / f;
 }
 
 // Русские склонения

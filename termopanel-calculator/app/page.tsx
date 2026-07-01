@@ -13,10 +13,13 @@ import ClientKP from "@/components/ClientKP";
 import Visualizer from "@/components/Visualizer";
 
 const INITIAL_INPUTS: CalcInputs = {
-  area: 120,
-  windows: 8,
+  length: 20,
+  width: 12,
+  wallHeight: 3,
+  windowsArea: 15,
+  foundationHeight: 0.8,
   corners: 4,
-  perimeter: 44,
+  windows: 8,
 };
 
 export default function Page() {
@@ -71,11 +74,11 @@ export default function Page() {
             onPrices={setPrices}
             onResetPrices={() => setPrices(DEFAULT_PRICES)}
           />
-          <EstimatePanel estimate={estimate} area={inputs.area} />
+          <EstimatePanel estimate={estimate} />
         </div>
 
         {/* Данные клиента + отправка КП в WhatsApp */}
-        <ClientKP estimate={estimate} area={inputs.area} />
+        <ClientKP estimate={estimate} />
 
         {/* Полноширинная AI-визуализация */}
         <Visualizer

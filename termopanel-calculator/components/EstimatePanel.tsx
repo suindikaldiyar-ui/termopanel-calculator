@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from "react";
 import type { Estimate } from "@/lib/calc";
-import { fmtMoney } from "@/lib/calc";
+import { fmtMoney, fmtNum } from "@/lib/calc";
 
 interface Props {
   estimate: Estimate;
-  area: number;
 }
 
-export default function EstimatePanel({ estimate, area }: Props) {
+export default function EstimatePanel({ estimate }: Props) {
   const handlePrint = () => window.print();
 
   // Дата вычисляется на клиенте (без hydration mismatch)
@@ -87,6 +86,14 @@ export default function EstimatePanel({ estimate, area }: Props) {
         ))}
       </div>
 
+      {/* Общая площадь */}
+      <div className="mx-3 flex items-center justify-between rounded-xl border border-line bg-canvas px-4 py-2.5">
+        <span className="text-sm font-medium text-muted">Общая площадь</span>
+        <span className="tnum text-base font-bold text-ink">
+          {fmtNum(estimate.totalArea)} м²
+        </span>
+      </div>
+
       {/* ИТОГО — золотой градиент, тёмный текст */}
       <div className="print-total m-3 rounded-xl bg-gradient-to-br from-gold to-goldLight px-5 py-4 text-stone shadow-gold">
         <div className="flex items-end justify-between">
@@ -99,10 +106,10 @@ export default function EstimatePanel({ estimate, area }: Props) {
         </div>
         <div className="mt-3 flex items-center justify-between border-t border-stone/20 pt-2.5">
           <span className="text-xs font-medium text-stone/60">
-            Цена за 1 м² фасада
+            Цена за 1 м² (общая площадь)
           </span>
           <span className="tnum text-sm font-bold text-stone">
-            {area > 0 ? fmtMoney(estimate.pricePerM2) : "—"}
+            {estimate.totalArea > 0 ? fmtMoney(estimate.pricePerM2) : "—"}
           </span>
         </div>
       </div>

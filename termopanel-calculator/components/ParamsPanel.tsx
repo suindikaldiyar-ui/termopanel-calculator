@@ -11,11 +11,26 @@ interface Props {
   onResetPrices: () => void;
 }
 
-const NUM_FIELDS: { key: keyof CalcInputs; label: string; suffix: string; step?: number }[] = [
-  { key: "area", label: "Площадь фасада", suffix: "м²", step: 1 },
-  { key: "windows", label: "Количество окон", suffix: "шт", step: 1 },
+const NUM_FIELDS: {
+  key: keyof CalcInputs;
+  label: string;
+  suffix: string;
+  step?: number;
+  hint?: string;
+}[] = [
+  { key: "length", label: "Длина дома", suffix: "м", step: 0.1 },
+  { key: "width", label: "Ширина дома", suffix: "м", step: 0.1 },
+  { key: "wallHeight", label: "Высота стен", suffix: "м", step: 0.1 },
+  { key: "windowsArea", label: "Площадь окон, всего", suffix: "м²", step: 0.1 },
+  {
+    key: "foundationHeight",
+    label: "Высота фундамента",
+    suffix: "м",
+    step: 0.05,
+    hint: "утепление 3 см",
+  },
   { key: "corners", label: "Количество углов", suffix: "шт", step: 1 },
-  { key: "perimeter", label: "Периметр фундамента", suffix: "м", step: 1 },
+  { key: "windows", label: "Количество окон", suffix: "шт", step: 1 },
 ];
 
 export default function ParamsPanel({
@@ -35,7 +50,12 @@ export default function ParamsPanel({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {NUM_FIELDS.map((f) => (
           <label key={f.key} className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-muted">{f.label}</span>
+            <span className="text-sm font-medium text-muted">
+              {f.label}
+              {f.hint && (
+                <span className="ml-1 text-xs text-gold">· {f.hint}</span>
+              )}
+            </span>
             <div className="relative">
               <input
                 type="number"

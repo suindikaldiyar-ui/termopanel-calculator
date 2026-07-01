@@ -10,14 +10,14 @@ interface Props {
 }
 
 const FIELDS: { key: keyof Prices; label: string; suffix: string; locked?: boolean }[] = [
-  { key: "panel", label: "Термопанель", suffix: "тг/м²", locked: true },
+  { key: "termopanelPricePerM2", label: "Термопанель", suffix: "тг/м²" },
   { key: "gluePerBag", label: "Клей", suffix: "тг/мешок" },
   { key: "travertinePerBucket", label: "Травертин", suffix: "тг/ведро" },
   { key: "lacquerPerCan", label: "Лак", suffix: "тг/банка" },
   { key: "framingPerMeter", label: "Обрамление", suffix: "тг/м" },
   { key: "cornerPerUnit", label: "Углы", suffix: "тг/угол" },
-  { key: "foundationPerMeter", label: "Фундамент", suffix: "тг/м" },
-  { key: "foundationPaintPerLiter", label: "Краска цоколя", suffix: "тг/л" },
+  { key: "foundationMaterialPerM2", label: "Фундамент: материал", suffix: "тг/м²" },
+  { key: "foundationPaintPerM2", label: "Фундамент: краска", suffix: "тг/м²" },
 ];
 
 export default function PriceSettings({ prices, onChange, onReset }: Props) {

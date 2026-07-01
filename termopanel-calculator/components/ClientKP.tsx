@@ -2,12 +2,11 @@
 
 import { useState } from "react";
 import type { Estimate } from "@/lib/calc";
-import { fmtMoney } from "@/lib/calc";
+import { fmtMoney, fmtNum } from "@/lib/calc";
 import { COMPANY } from "@/lib/company";
 
 interface Props {
   estimate: Estimate;
-  area: number;
 }
 
 // Нормализация телефона клиента → чистые цифры для wa.me
@@ -19,7 +18,7 @@ function normalizePhone(raw: string): string {
   return d;
 }
 
-export default function ClientKP({ estimate, area }: Props) {
+export default function ClientKP({ estimate }: Props) {
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
@@ -43,8 +42,11 @@ export default function ClientKP({ estimate, area }: Props) {
       `Расчёт фасада (термопанель, травертин):\n` +
       `${lines}\n` +
       `──────────────────────\n` +
+      `Термопанель (чистая площадь): ${fmtNum(estimate.panelArea)} м²\n` +
+      `Фундамент (материал + краска): ${fmtNum(estimate.foundationArea)} м²\n` +
+      `Общая площадь: ${fmtNum(estimate.totalArea)} м²\n\n` +
       `ИТОГО: ${fmtMoney(estimate.total)}\n` +
-      `Цена за 1 м²: ${area > 0 ? fmtMoney(estimate.pricePerM2) : "—"}\n\n` +
+      `Цена за 1 м²: ${estimate.totalArea > 0 ? fmtMoney(estimate.pricePerM2) : "—"}\n\n` +
       `Наш контакт: ${COMPANY.phone}\n\n` +
       `* Цены действительны на момент расчёта.`
     );
