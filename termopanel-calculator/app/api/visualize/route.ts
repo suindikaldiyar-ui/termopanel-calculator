@@ -118,7 +118,16 @@ export async function POST(req: NextRequest) {
     .map(getDecor)
     .filter((d): d is DecorItem => Boolean(d));
 
-  // Обрамление окон — необязательный ТРЕТИЙ референс. Нет файла → работаем по hint.
+  // Цоколь — фото-референс (если есть файл), иначе fallback по hint.
+  let foundationAsset: ImageAsset | null = null;
+  if (foundation) {
+    foundationAsset = loadAssetFromDisk("foundations", foundation.id);
+    if (!foundationAsset) {
+      foundationAsset = await loadAssetFromUrl("foundations", foundation.id, getOrigin(req));
+    }
+  }
+
+  // Обрамление окон — фото-референс (если есть файл), иначе fallback по hint.
   const frame = getFrame(frameId);
   let frameAsset: ImageAsset | null = null;
   if (frame) {
@@ -129,6 +138,25 @@ export async function POST(req: NextRequest) {
   }
 
   const userComment = (comment || "").trim();
+
+  // Референс-картинки по порядку: IMAGE 1 = дом, IMAGE 2 = материал стен,
+  // далее обрамление и цоколь (если выбраны). Номера вычисляем динамически,
+  // чтобы промпт ссылался на фактическую позицию каждой картинки.
+  const imageParts: any[] = [
+    { inline_data: { mime_type: mimeType, data: image } }, // IMAGE 1 — дом
+    { inline_data: { mime_type: texture.mimeType, data: texture.data } }, // IMAGE 2 — материал стен
+  ];
+  let imgCount = 2;
+  let frameIndex = 0;
+  let foundationIndex = 0;
+  if (frameAsset) {
+    frameIndex = ++imgCount; // IMAGE 3 (или далее)
+    imageParts.push({ inline_data: { mime_type: frameAsset.mimeType, data: frameAsset.data } });
+  }
+  if (foundationAsset) {
+    foundationIndex = ++imgCount; // следующий индекс после обрамления
+    imageParts.push({ inline_data: { mime_type: foundationAsset.mimeType, data: foundationAsset.data } });
+  }
 
   // Строгий промпт: цвет и рисунок берём СТРОГО из IMAGE 2.
   let prompt =
@@ -144,8 +172,15 @@ export async function POST(req: NextRequest) {
     `the veranda/porch structure, railings, stairs, roof, sky, ground, plants and ` +
     `background. Same camera angle. Photorealistic, natural daylight, high quality.`;
 
-  // Цоколь — разрешённое добавление (только если выбран)
-  if (foundation?.hint) {
+  // Цоколь — фото-референс (IMAGE {foundationIndex}) либо текст (fallback по hint)
+  if (foundation && foundationAsset) {
+    prompt +=
+      `\n\nIMAGE ${foundationIndex} shows the plinth/basement panel texture (3D beveled ` +
+      `brick-look). Clad ONLY the bottom base/plinth of the house (about 0.4-0.5 m high) ` +
+      `with EXACTLY this panel texture and color from IMAGE ${foundationIndex} — do not ` +
+      `invent a different one. Keep the wall material (travertine) above the plinth ` +
+      `unchanged. Ignore any background/surroundings in that reference, copy only the panel surface.`;
+  } else if (foundation?.hint) {
     prompt +=
       `\n\nAlso clad the base/plinth (about 0.4-0.5 m high) along the bottom of the ` +
       `walls in ${foundation.hint}, with a crisp clean top edge. This plinth is an intended addition.`;
@@ -158,13 +193,13 @@ export async function POST(req: NextRequest) {
       `Render them realistically at natural scale.`;
   }
 
-  // Обрамление окон — по фото-референсу (IMAGE 3) или по тексту (fallback).
+  // Обрамление окон — по фото-референсу (IMAGE {frameIndex}) или по тексту (fallback).
   if (frame && frameAsset) {
     prompt +=
-      `\n\nAdd the same window trim as shown in IMAGE 3 around every window. The trim ` +
+      `\n\nAdd the same window trim as shown in IMAGE ${frameIndex} around every window. The trim ` +
       `color MUST be ${frame.color} — do NOT make it white if the reference is dark. ` +
-      `Replicate the EXACT profile, shape and COLOR from IMAGE 3. IMPORTANT: ignore ` +
-      `the window glass, curtains and interior visible in IMAGE 3 — copy ONLY the ` +
+      `Replicate the EXACT profile, shape and COLOR from IMAGE ${frameIndex}. IMPORTANT: ignore ` +
+      `the window glass, curtains and interior visible in IMAGE ${frameIndex} — copy ONLY the ` +
       `decorative trim frame (surround, pilasters, cornice, sill), not the glass or ` +
       `what is behind it. Keep the house's own windows and glass from IMAGE 1 unchanged.`;
   } else if (frame) {
@@ -194,16 +229,8 @@ export async function POST(req: NextRequest) {
     prompt += `\n\nAdditional user instructions (follow them): ${userComment}`;
   }
 
-  // contents.parts = [ {text}, IMAGE1=дом, IMAGE2=текстура_стен, IMAGE3=обрамление? ]
-  const parts: any[] = [
-    { text: prompt },
-    { inline_data: { mime_type: mimeType, data: image } }, // IMAGE 1 — дом
-    { inline_data: { mime_type: texture.mimeType, data: texture.data } }, // IMAGE 2 — материал стен
-  ];
-  if (frameAsset) {
-    // IMAGE 3 — референс обрамления окон
-    parts.push({ inline_data: { mime_type: frameAsset.mimeType, data: frameAsset.data } });
-  }
+  // contents.parts = текст + все референс-картинки по порядку
+  const parts: any[] = [{ text: prompt }, ...imageParts];
 
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
 
