@@ -9,6 +9,7 @@ import {
 } from "@/lib/calc";
 import ParamsPanel from "@/components/ParamsPanel";
 import EstimatePanel from "@/components/EstimatePanel";
+import ClientKP from "@/components/ClientKP";
 import Visualizer from "@/components/Visualizer";
 
 const INITIAL_INPUTS: CalcInputs = {
@@ -60,6 +61,9 @@ export default function Page() {
           />
           <EstimatePanel estimate={estimate} area={inputs.area} />
         </div>
+
+        {/* Данные клиента + отправка КП в WhatsApp */}
+        <ClientKP estimate={estimate} area={inputs.area} />
 
         {/* Полноширинная AI-визуализация */}
         <Visualizer />
