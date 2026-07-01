@@ -4,6 +4,7 @@ import { join } from "path";
 import { TEXTURES } from "@/lib/textures";
 import { getFoundation } from "@/lib/foundations";
 import { getDecor, type DecorItem } from "@/lib/decor";
+import { getFrame } from "@/lib/frames";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -16,19 +17,20 @@ interface Body {
   textureId?: string; // id выбранной текстуры
   foundationId?: string | null; // id отделки цоколя (null = без цоколя)
   decorIds?: string[]; // id выбранного декора (мультивыбор)
+  frameId?: string | null; // id обрамления окон (null = без обрамления)
   withBrackets?: boolean; // кронштейны: true = с, false = без, undefined = без указания
   comment?: string; // доп. комментарий пользователя
 }
 
-type TextureData = { data: string; mimeType: string; bytes: number };
+type ImageAsset = { data: string; mimeType: string; bytes: number };
 
-// 1) Приоритет: читаем фото текстуры с диска (благодаря outputFileTracingIncludes
-//    файлы попадают в serverless-бандл на Vercel).
-function loadTextureFromDisk(textureId: string): TextureData | null {
+// 1) Приоритет: читаем картинку-референс с диска (благодаря outputFileTracingIncludes
+//    файлы попадают в serverless-бандл на Vercel). folder — папка в public/.
+function loadAssetFromDisk(folder: string, id: string): ImageAsset | null {
   try {
-    const filePath = join(process.cwd(), "public", "textures", `${textureId}.jpg`);
+    const filePath = join(process.cwd(), "public", folder, `${id}.jpg`);
     const buf = readFileSync(filePath);
-    console.log(`texture loaded (disk): ${textureId}, ${buf.length} bytes`);
+    console.log(`${folder} loaded (disk): ${id}, ${buf.length} bytes`);
     return { data: buf.toString("base64"), mimeType: "image/jpeg", bytes: buf.length };
   } catch {
     return null; // файла нет в бандле
@@ -36,16 +38,17 @@ function loadTextureFromDisk(textureId: string): TextureData | null {
 }
 
 // 2) Подстраховка: если файла нет в бандле — тянем по публичному URL.
-async function loadTextureFromUrl(
-  textureId: string,
+async function loadAssetFromUrl(
+  folder: string,
+  id: string,
   origin: string | null
-): Promise<TextureData | null> {
+): Promise<ImageAsset | null> {
   if (!origin) return null;
   try {
-    const res = await fetch(`${origin}/textures/${textureId}.jpg`);
+    const res = await fetch(`${origin}/${folder}/${id}.jpg`);
     if (!res.ok) return null;
     const buf = Buffer.from(await res.arrayBuffer());
-    console.log(`texture loaded (url): ${textureId}, ${buf.length} bytes`);
+    console.log(`${folder} loaded (url): ${id}, ${buf.length} bytes`);
     return { data: buf.toString("base64"), mimeType: "image/jpeg", bytes: buf.length };
   } catch {
     return null;
@@ -78,7 +81,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Некорректный запрос." }, { status: 400 });
   }
 
-  const { image, textureId, foundationId, decorIds, withBrackets, comment } = body;
+  const { image, textureId, foundationId, decorIds, frameId, withBrackets, comment } = body;
   const mimeType = body.mimeType || "image/jpeg";
 
   if (!image) {
@@ -99,9 +102,9 @@ export async function POST(req: NextRequest) {
 
   // Образец: сначала с диска, при неудаче — фолбэк по публичному URL.
   // Нет ни там, ни там → НЕ подменяем описанием, а сразу ошибка.
-  let texture = loadTextureFromDisk(textureId);
+  let texture = loadAssetFromDisk("textures", textureId);
   if (!texture) {
-    texture = await loadTextureFromUrl(textureId, getOrigin(req));
+    texture = await loadAssetFromUrl("textures", textureId, getOrigin(req));
   }
   if (!texture) {
     return NextResponse.json(
@@ -114,6 +117,17 @@ export async function POST(req: NextRequest) {
   const decors = (decorIds ?? [])
     .map(getDecor)
     .filter((d): d is DecorItem => Boolean(d));
+
+  // Обрамление окон — необязательный ТРЕТИЙ референс. Нет файла → работаем по hint.
+  const frame = getFrame(frameId);
+  let frameAsset: ImageAsset | null = null;
+  if (frame) {
+    frameAsset = loadAssetFromDisk("frames", frame.id);
+    if (!frameAsset) {
+      frameAsset = await loadAssetFromUrl("frames", frame.id, getOrigin(req));
+    }
+  }
+
   const userComment = (comment || "").trim();
 
   // Строгий промпт: цвет и рисунок берём СТРОГО из IMAGE 2.
@@ -144,6 +158,20 @@ export async function POST(req: NextRequest) {
       `Render them realistically at natural scale.`;
   }
 
+  // Обрамление окон — по фото-референсу (IMAGE 3) или по тексту (fallback).
+  if (frame && frameAsset) {
+    prompt +=
+      `\n\nThe THIRD image shows the window trim/frame style to apply. Add the same style ` +
+      `of decorative trim (surround, side pilasters, top cornice) around EVERY window ` +
+      `of the house, matching the THIRD image. Keep it white/cream, realistic scale. ` +
+      `Only add the frame around each window — do not cover or change the window glass.`;
+  } else if (frame) {
+    prompt +=
+      `\n\nAdd decorative window trim around EVERY window of the house: ${frame.hint}. ` +
+      `Keep it white/cream, realistic scale. Only add the frame around each window — ` +
+      `do not cover or change the window glass.`;
+  }
+
   // Кронштейны — две версии рендера (для сравнения)
   if (withBrackets === false) {
     prompt +=
@@ -162,12 +190,16 @@ export async function POST(req: NextRequest) {
     prompt += `\n\nAdditional user instructions (follow them): ${userComment}`;
   }
 
-  // contents.parts = [ {text}, {inline_data: дом}, {inline_data: текстура} ]
+  // contents.parts = [ {text}, IMAGE1=дом, IMAGE2=текстура_стен, IMAGE3=обрамление? ]
   const parts: any[] = [
     { text: prompt },
     { inline_data: { mime_type: mimeType, data: image } }, // IMAGE 1 — дом
-    { inline_data: { mime_type: texture.mimeType, data: texture.data } }, // IMAGE 2 — текстура
+    { inline_data: { mime_type: texture.mimeType, data: texture.data } }, // IMAGE 2 — материал стен
   ];
+  if (frameAsset) {
+    // IMAGE 3 — референс обрамления окон
+    parts.push({ inline_data: { mime_type: frameAsset.mimeType, data: frameAsset.data } });
+  }
 
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
 
