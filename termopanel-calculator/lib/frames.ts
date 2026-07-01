@@ -19,6 +19,8 @@ export const FRAMES: FrameItem[] = [
     image: "/frames/frame2.jpg",
     hint: "white flat window surround, like the reference photo",
   },
+  { id:"frame3", name:"Классика 3", image:"/frames/frame3.jpg",
+  hint:"white classic window trim, like the reference photo" },
 ];
 
 export const getFrame = (id?: string | null) =>
