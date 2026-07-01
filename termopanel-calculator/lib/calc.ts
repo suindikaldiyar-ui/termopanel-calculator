@@ -1,7 +1,6 @@
 // ──────────────────────────────────────────
 // Расчёт сметы термопанельного фасада
 // ──────────────────────────────────────────
-import { getFoundation } from "./foundations";
 import { getDecor, type DecorItem } from "./decor";
 
 // Нормы расхода (ЗАФИКСИРОВАНЫ — не менять)
@@ -215,32 +214,20 @@ export function calculate(
     total: round(cornersMeters * prices.cornerPerMeter),
   });
 
-  // 7. Фундамент = foundationArea × (материал + краска).
-  //    Выбран цоколь из каталога → отдельная логика (цена за пог. метр).
-  const foundation = getFoundation(foundationId);
-  if (foundation) {
-    items.push({
-      key: "foundation",
-      name: `Цоколь: ${foundation.name}`,
-      detail: `${fmtNum(perimeter)} м`,
-      unitLabel: "тг/м",
-      unitPrice: foundation.pricePerM,
-      total: round(perimeter * foundation.pricePerM),
-    });
-  } else {
-    const foundationPerM2 =
-      prices.foundationMaterialPerM2 + prices.foundationPaintPerM2;
-    items.push({
-      key: "foundation",
-      name: "Фундамент",
-      detail:
-        `${fmtNum(foundationArea)} м² (${fmtNum(perimeter)} м × ${fmtNum(foundationHeight)} м) · ` +
-        `(${fmtNum(prices.foundationMaterialPerM2)} + ${fmtNum(prices.foundationPaintPerM2)}) тг/м²`,
-      unitLabel: "тг/м²",
-      unitPrice: foundationPerM2,
-      total: round(foundationArea * foundationPerM2),
-    });
-  }
+  // 7. Фундамент = foundationArea × (материал + краска). ВСЕГДА базовый расчёт.
+  //    Выбор цоколя из каталога влияет ТОЛЬКО на визуализацию, не на смету.
+  const foundationPerM2 =
+    prices.foundationMaterialPerM2 + prices.foundationPaintPerM2;
+  items.push({
+    key: "foundation",
+    name: "Фундамент",
+    detail:
+      `${fmtNum(foundationArea)} м² (${fmtNum(perimeter)} м × ${fmtNum(foundationHeight)} м) · ` +
+      `(${fmtNum(prices.foundationMaterialPerM2)} + ${fmtNum(prices.foundationPaintPerM2)}) тг/м²`,
+    unitLabel: "тг/м²",
+    unitPrice: foundationPerM2,
+    total: round(foundationArea * foundationPerM2),
+  });
 
   // 8. Затирка = 🎁 БОНУС, бесплатно
   items.push({
