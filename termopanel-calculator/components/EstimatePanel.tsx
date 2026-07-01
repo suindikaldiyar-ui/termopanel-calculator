@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { Estimate } from "@/lib/calc";
 import { fmtMoney } from "@/lib/calc";
 
@@ -11,8 +12,25 @@ interface Props {
 export default function EstimatePanel({ estimate, area }: Props) {
   const handlePrint = () => window.print();
 
+  // Дата вычисляется на клиенте (без hydration mismatch)
+  const [today, setToday] = useState("");
+  useEffect(() => {
+    setToday(new Date().toLocaleDateString("ru-RU"));
+  }, []);
+
   return (
     <div className="print-block flex h-full flex-col rounded-2xl border border-line bg-surface shadow-card">
+      {/* Печатная шапка с логотипом — видна только при печати */}
+      <div className="print-only mb-4 border-b border-line pb-4 text-center">
+        <img
+          src="/logo.png"
+          alt="Логотип компании"
+          className="mx-auto h-[60px] w-auto object-contain"
+        />
+        <div className="mt-3 text-lg font-bold">Коммерческое предложение</div>
+        {today && <div className="mt-0.5 text-sm">от {today}</div>}
+      </div>
+
       {/* Заголовок + золотая линия */}
       <div className="px-5 pt-5 sm:px-6">
         <div className="flex items-center justify-between">

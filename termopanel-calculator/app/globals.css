@@ -29,6 +29,11 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
+/* Печатная шапка сметы — скрыта на экране, показывается при печати */
+.print-only {
+  display: none;
+}
+
 /* ── Печать сметы: ИНВЕРСИЯ под бумагу (белый фон, тёмный текст) ── */
 @media print {
   html,
@@ -38,6 +43,9 @@ input[type="number"] {
   }
   .no-print {
     display: none !important;
+  }
+  .print-only {
+    display: block !important;
   }
   /* карточка сметы */
   .print-block {

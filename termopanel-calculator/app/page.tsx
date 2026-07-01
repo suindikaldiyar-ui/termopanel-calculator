@@ -31,14 +31,19 @@ export default function Page() {
       <header className="border-b border-line bg-stone text-ink">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-gold to-goldLight text-lg font-black text-stone shadow-gold">
-              Т
+            {/* Логотип на белом фоне вписан в светлую плашку */}
+            <span className="inline-flex shrink-0 items-center justify-center rounded-xl border border-gold/40 bg-[#F2EDE3] p-2 shadow-gold">
+              <img
+                src="/logo.png"
+                alt="Логотип компании"
+                className="h-9 w-auto object-contain sm:h-11"
+              />
             </span>
-            <div>
-              <h1 className="text-lg font-extrabold leading-tight tracking-tight">
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-extrabold leading-tight tracking-tight">
                 Термопанель
               </h1>
-              <p className="text-xs text-muted">
+              <p className="truncate text-xs text-muted">
                 Калькулятор фасада · AI-визуализация
               </p>
             </div>
