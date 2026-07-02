@@ -7,6 +7,7 @@ import { getDecor, type DecorItem } from "@/lib/decor";
 import { getFrame } from "@/lib/frames";
 import { getColumn } from "@/lib/columns";
 import { getBelt } from "@/lib/belts";
+import { getBracket } from "@/lib/brackets";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -22,7 +23,7 @@ interface Body {
   frameId?: string | null; // id обрамления окон (null = без обрамления)
   columnId?: string | null; // id угловой колонны (null = без колонн)
   beltId?: string | null; // id межэтажного пояса (null = без пояса)
-  withBrackets?: boolean; // кронштейны: true = с, false = без, undefined = без указания
+  bracketId?: string | null; // id кронштейна (null = без кронштейна)
   comment?: string; // доп. комментарий пользователя
 }
 
@@ -85,7 +86,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Некорректный запрос." }, { status: 400 });
   }
 
-  const { image, textureId, foundationId, decorIds, frameId, columnId, beltId, withBrackets, comment } = body;
+  const { image, textureId, foundationId, decorIds, frameId, columnId, beltId, bracketId, comment } = body;
   const mimeType = body.mimeType || "image/jpeg";
 
   if (!image) {
@@ -161,6 +162,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Кронштейны — фото-референс (если есть файл), иначе fallback по hint.
+  const bracket = getBracket(bracketId);
+  let bracketAsset: ImageAsset | null = null;
+  if (bracket) {
+    bracketAsset = loadAssetFromDisk("brackets", bracket.id);
+    if (!bracketAsset) {
+      bracketAsset = await loadAssetFromUrl("brackets", bracket.id, getOrigin(req));
+    }
+  }
+
   const userComment = (comment || "").trim();
 
   // Референс-картинки по порядку: IMAGE 1 = дом, IMAGE 2 = материал стен,
@@ -188,8 +199,13 @@ export async function POST(req: NextRequest) {
     imageParts.push({ inline_data: { mime_type: columnAsset.mimeType, data: columnAsset.data } });
   }
   if (beltAsset) {
-    beltIndex = ++imgCount; // последний референс (после колонны)
+    beltIndex = ++imgCount; // после колонны
     imageParts.push({ inline_data: { mime_type: beltAsset.mimeType, data: beltAsset.data } });
+  }
+  let bracketIndex = 0;
+  if (bracketAsset) {
+    bracketIndex = ++imgCount; // последний референс (после пояса)
+    imageParts.push({ inline_data: { mime_type: bracketAsset.mimeType, data: bracketAsset.data } });
   }
 
   // Строгий промпт: цвет и рисунок берём СТРОГО из IMAGE 2.
@@ -276,19 +292,21 @@ export async function POST(req: NextRequest) {
       `Do NOT put it on windows, corners, roof or ground.`;
   }
 
-  // Кронштейны — две версии рендера (для сравнения)
-  if (withBrackets === false) {
+  // Кронштейны — по фото-референсу (IMAGE {bracketIndex}) или по тексту (fallback).
+  if (bracket && bracketAsset) {
     prompt +=
-      `\n\nDo NOT add any brackets, corbels or decorative console elements to the facade. ` +
-      `Keep the facade clean without support brackets.`;
-  } else if (withBrackets === true) {
+      `\n\nIMAGE ${bracketIndex} shows a decorative bracket/corbel. Add small brackets of ` +
+      `EXACTLY this design (matching shape and color from IMAGE ${bracketIndex}) at the TOP ` +
+      `CORNERS of each window trim — where the side pilasters meet the top cornice, left and ` +
+      `right of every window. Do NOT place them under the roof, on walls or building corners ` +
+      `— ONLY at the upper sides of window frames. Small, symmetric, natural scale. Ignore ` +
+      `background in IMAGE ${bracketIndex}, copy only the bracket.`;
+  } else if (bracket) {
     prompt +=
-      `\n\nAdd small decorative corbels (brackets) at the TOP CORNERS of each WINDOW's ` +
-      `trim — where the side pilasters meet the top cornice of the window frame, on the ` +
-      `left and right side of every window. These brackets support the window's top ` +
-      `cornice. Do NOT place any brackets under the roof, on the roofline, on the walls ` +
-      `or at the building corners — ONLY at the upper sides of the window frames. ` +
-      `Small, symmetric, ornamental, matching the classic trim style, natural scale.`;
+      `\n\nAdd small decorative brackets/corbels (${bracket.hint}) at the TOP CORNERS of each ` +
+      `window trim — where the side pilasters meet the top cornice, left and right of every ` +
+      `window. Do NOT place them under the roof, on walls or building corners — ONLY at the ` +
+      `upper sides of window frames. Small, symmetric, natural scale.`;
   }
 
   // Доп. инструкции пользователя

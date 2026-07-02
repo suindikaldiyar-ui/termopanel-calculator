@@ -12,6 +12,7 @@ const nextConfig = {
         "./public/foundations/**",
         "./public/columns/**",
         "./public/belts/**",
+        "./public/brackets/**",
       ],
     },
   },
