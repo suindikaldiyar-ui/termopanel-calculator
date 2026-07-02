@@ -14,6 +14,12 @@ export const COLUMNS: ColumnItem[] = [
     image: "/columns/column1.jpg",
     hint: "white classic corner column/pilaster with rectangular raised panels and a capital on top, like the reference image",
   },
+  {
+    id: "column2",
+    name: "Классика 2",
+    image: "/columns/column2.jpg",
+    hint: "white fluted classic corner column with vertical grooves and a base at the bottom, like the reference image",
+  },
 ];
 
 export const getColumn = (id?: string | null) =>
