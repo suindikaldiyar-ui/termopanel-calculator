@@ -6,6 +6,7 @@ import { getFoundation } from "@/lib/foundations";
 import { getDecor, type DecorItem } from "@/lib/decor";
 import { getFrame } from "@/lib/frames";
 import { getColumn } from "@/lib/columns";
+import { getBelt } from "@/lib/belts";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,6 +21,7 @@ interface Body {
   decorIds?: string[]; // id выбранного декора (мультивыбор)
   frameId?: string | null; // id обрамления окон (null = без обрамления)
   columnId?: string | null; // id угловой колонны (null = без колонн)
+  beltId?: string | null; // id межэтажного пояса (null = без пояса)
   withBrackets?: boolean; // кронштейны: true = с, false = без, undefined = без указания
   comment?: string; // доп. комментарий пользователя
 }
@@ -83,7 +85,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Некорректный запрос." }, { status: 400 });
   }
 
-  const { image, textureId, foundationId, decorIds, frameId, columnId, withBrackets, comment } = body;
+  const { image, textureId, foundationId, decorIds, frameId, columnId, beltId, withBrackets, comment } = body;
   const mimeType = body.mimeType || "image/jpeg";
 
   if (!image) {
@@ -149,6 +151,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Межэтажный пояс — фото-референс (если есть файл), иначе fallback по hint.
+  const belt = getBelt(beltId);
+  let beltAsset: ImageAsset | null = null;
+  if (belt) {
+    beltAsset = loadAssetFromDisk("belts", belt.id);
+    if (!beltAsset) {
+      beltAsset = await loadAssetFromUrl("belts", belt.id, getOrigin(req));
+    }
+  }
+
   const userComment = (comment || "").trim();
 
   // Референс-картинки по порядку: IMAGE 1 = дом, IMAGE 2 = материал стен,
@@ -162,6 +174,7 @@ export async function POST(req: NextRequest) {
   let frameIndex = 0;
   let foundationIndex = 0;
   let columnIndex = 0;
+  let beltIndex = 0;
   if (frameAsset) {
     frameIndex = ++imgCount; // IMAGE 3 (или далее)
     imageParts.push({ inline_data: { mime_type: frameAsset.mimeType, data: frameAsset.data } });
@@ -171,8 +184,12 @@ export async function POST(req: NextRequest) {
     imageParts.push({ inline_data: { mime_type: foundationAsset.mimeType, data: foundationAsset.data } });
   }
   if (columnAsset) {
-    columnIndex = ++imgCount; // последний референс (после цоколя)
+    columnIndex = ++imgCount; // после цоколя
     imageParts.push({ inline_data: { mime_type: columnAsset.mimeType, data: columnAsset.data } });
+  }
+  if (beltAsset) {
+    beltIndex = ++imgCount; // последний референс (после колонны)
+    imageParts.push({ inline_data: { mime_type: beltAsset.mimeType, data: beltAsset.data } });
   }
 
   // Строгий промпт: цвет и рисунок берём СТРОГО из IMAGE 2.
@@ -242,6 +259,21 @@ export async function POST(req: NextRequest) {
       `\n\nAdd decorative corner columns/pilasters on the OUTER CORNERS of the house: ${column.hint}. ` +
       `Place them ONLY on the building corners, not on windows. Keep the wall travertine ` +
       `and windows unchanged. White/cream, realistic scale.`;
+  }
+
+  // Межэтажный пояс — по фото-референсу (IMAGE {beltIndex}) или по тексту (fallback).
+  if (belt && beltAsset) {
+    prompt +=
+      `\n\nIMAGE ${beltIndex} shows a horizontal inter-floor belt/molding. Add this exact belt ` +
+      `profile as a HORIZONTAL decorative band running across the facade BETWEEN the floors ` +
+      `(at the boundary between the 1st and 2nd floor), matching the profile and color from ` +
+      `IMAGE ${beltIndex}. Keep it a thin horizontal band only. Do NOT put it on windows, ` +
+      `corners, roof or ground. Ignore background in IMAGE ${beltIndex}, copy only the molding profile.`;
+  } else if (belt) {
+    prompt +=
+      `\n\nAdd a horizontal inter-floor decorative belt/molding running across the facade ` +
+      `between the 1st and 2nd floor: ${belt.hint}. Keep it a thin horizontal band only. ` +
+      `Do NOT put it on windows, corners, roof or ground.`;
   }
 
   // Кронштейны — две версии рендера (для сравнения)

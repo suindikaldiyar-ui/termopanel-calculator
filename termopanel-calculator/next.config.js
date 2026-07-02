@@ -11,6 +11,7 @@ const nextConfig = {
         "./public/frames/**",
         "./public/foundations/**",
         "./public/columns/**",
+        "./public/belts/**",
       ],
     },
   },
