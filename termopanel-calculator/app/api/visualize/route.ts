@@ -192,11 +192,14 @@ export async function POST(req: NextRequest) {
   // Цоколь — фото-референс (IMAGE {foundationIndex}) либо текст (fallback по hint)
   if (foundation && foundationAsset) {
     prompt +=
-      `\n\nIMAGE ${foundationIndex} shows the plinth/basement panel texture (3D beveled ` +
-      `brick-look). Clad ONLY the bottom base/plinth of the house (about 0.4-0.5 m high) ` +
-      `with EXACTLY this panel texture and color from IMAGE ${foundationIndex} — do not ` +
-      `invent a different one. Keep the wall material (travertine) above the plinth ` +
-      `unchanged. Ignore any background/surroundings in that reference, copy only the panel surface.`;
+      `\n\nIMAGE ${foundationIndex} shows the plinth/basement panel texture. Apply this panel ` +
+      `texture ONLY to the narrow plinth strip at the very bottom of the house WALLS — a ` +
+      `horizontal band about 0.4-0.5 meters high directly under the wall cladding, right above ` +
+      `the ground. CRITICAL: do NOT apply this texture to the ground, pavement, walkway, soil, ` +
+      `tiles, stairs or any horizontal surface in front of or around the house. The plinth is ` +
+      `ONLY the vertical base of the building walls. Everything below the wall base (ground, ` +
+      `paving, foreground) must stay EXACTLY as in IMAGE 1, untouched. Copy only the panel ` +
+      `surface from IMAGE ${foundationIndex}, ignore its background.`;
   } else if (foundation?.hint) {
     prompt +=
       `\n\nAlso clad the base/plinth (about 0.4-0.5 m high) along the bottom of the ` +
