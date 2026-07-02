@@ -18,6 +18,22 @@ export const FOUNDATIONS: FoundationItem[] = [
     hint: "3D beveled brick-look facade panels, taupe/mauve color, protruding rectangular blocks like the reference photo",
     pricePerM: 0,
   },
+  {
+    id: "fb13",
+    name: "Термоплитка ФБ-13",
+    image: "/foundations/fb13.jpg",
+    swatch: "#6B4A3A",
+    hint: "brown brick-look tile plinth panels, glossy ceramic brick cladding, like the reference photo",
+    pricePerM: 0,
+  },
+  {
+    id: "fb17",
+    name: "Термоплитка ФБ-17",
+    image: "/foundations/fb17.jpg",
+    swatch: "#5A4A42",
+    hint: "brown-grey natural flagstone/boulder-look tile plinth panels, irregular stone pattern, like the reference photo",
+    pricePerM: 0,
+  },
 ];
 
 export const getFoundation = (id?: string | null) =>
