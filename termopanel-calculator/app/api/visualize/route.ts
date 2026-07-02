@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { TEXTURES } from "@/lib/textures";
 import { getFoundation } from "@/lib/foundations";
 import { getDecor, type DecorItem } from "@/lib/decor";
 import { getFrame } from "@/lib/frames";
@@ -19,7 +18,6 @@ const MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image";
 interface Body {
   image?: string; // фото дома, base64 (без префикса data:)
   mimeType?: string; // напр. image/jpeg
-  textureId?: string; // id выбранной текстуры
   foundationId?: string | null; // id отделки цоколя (null = без цоколя)
   decorIds?: string[]; // id выбранного декора (мультивыбор)
   frameId?: string | null; // id обрамления окон (null = без обрамления)
@@ -105,35 +103,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Некорректный запрос." }, { status: 400 });
   }
 
-  const { image, textureId, foundationId, decorIds, frameId, frameColor, facadeColorId, columnId, beltId, bracketId, termopanelId, comment } = body;
+  const { image, foundationId, decorIds, frameId, frameColor, facadeColorId, columnId, beltId, bracketId, termopanelId, comment } = body;
   const mimeType = body.mimeType || "image/jpeg";
   const frameColorText = frameColor === "yellow" ? "warm yellow/sand" : "white";
 
   if (!image) {
     return NextResponse.json(
       { error: "Не передано изображение дома." },
-      { status: 400 }
-    );
-  }
-
-  // Текстура обязательна и должна быть из каталога (защита от path traversal)
-  const textureMeta = TEXTURES.find((t) => t.id === textureId);
-  if (!textureId || !textureMeta) {
-    return NextResponse.json(
-      { error: "Не выбрана текстура травертина." },
-      { status: 400 }
-    );
-  }
-
-  // Образец: сначала с диска, при неудаче — фолбэк по публичному URL.
-  // Нет ни там, ни там → НЕ подменяем описанием, а сразу ошибка.
-  let texture = loadAssetFromDisk("textures", textureId);
-  if (!texture) {
-    texture = await loadAssetFromUrl("textures", textureId, getOrigin(req));
-  }
-  if (!texture) {
-    return NextResponse.json(
-      { error: `Текстура ${textureId} не найдена в public/textures/` },
       { status: 400 }
     );
   }
@@ -210,14 +186,13 @@ export async function POST(req: NextRequest) {
 
   const userComment = (comment || "").trim();
 
-  // Референс-картинки по порядку: IMAGE 1 = дом, IMAGE 2 = материал стен,
-  // далее обрамление и цоколь (если выбраны). Номера вычисляем динамически,
-  // чтобы промпт ссылался на фактическую позицию каждой картинки.
+  // Референс-картинки по порядку: IMAGE 1 = дом, далее выбранные референсы
+  // (обрамление, цоколь, колонна, пояс, кронштейн, термопанель-материал стен).
+  // Номера вычисляем динамически, чтобы промпт ссылался на фактическую позицию.
   const imageParts: any[] = [
     { inline_data: { mime_type: mimeType, data: image } }, // IMAGE 1 — дом
-    { inline_data: { mime_type: texture.mimeType, data: texture.data } }, // IMAGE 2 — материал стен
   ];
-  let imgCount = 2;
+  let imgCount = 1;
   let frameIndex = 0;
   let sideIndex = 0;
   let topIndex = 0;
@@ -260,27 +235,21 @@ export async function POST(req: NextRequest) {
     imageParts.push({ inline_data: { mime_type: termopanelAsset.mimeType, data: termopanelAsset.data } });
   }
 
-  // Строгий промпт: цвет и рисунок берём СТРОГО из IMAGE 2.
+  // Базовый промпт: IMAGE 1 = дом. Материал стен задаётся термопанелью (если выбрана).
   let prompt =
-    `Facade visualization with a reference material.\n` +
-    `IMAGE 1 = the house. IMAGE 2 = the exact travertine stone sample to use.\n\n` +
-    `Apply the travertine from IMAGE 2 onto all plaster walls of the house in IMAGE 1.\n` +
-    `CRITICAL: use the precise color, tone, veining and stone pattern from IMAGE 2 — ` +
-    `do NOT invent a different travertine, do NOT change its color or shade.\n` +
-    `Match the IMAGE 2 material exactly, only adapting its scale realistically to the walls.\n` +
-    `Use IMAGE 2 strictly as a material/color reference for the walls. Do NOT paste IMAGE 2 ` +
-    `as a picture, poster, sign or framed sample anywhere in the scene.\n\n` +
+    `Facade redesign visualization.\n` +
+    `IMAGE 1 = the house to redesign.\n\n` +
     `Keep strictly unchanged: building shape, all windows and window frames, doors, ` +
     `the veranda/porch structure, railings, stairs, roof, sky, ground, plants and ` +
     `background. Same camera angle. Photorealistic, natural daylight, high quality.`;
 
-  // Краска фасада — цвет стен (поверх/вместе с текстурой)
+  // Краска фасада — цвет стен (поверх/вместе с материалом стен)
   const facadeColor = getFacadeColor(facadeColorId);
   if (facadeColor?.hint) {
     prompt +=
       `\n\nPaint the facade walls in ${facadeColor.hint}. Apply this wall color across the ` +
-      `house walls. If a travertine texture is also applied, tint/paint it toward this color ` +
-      `while keeping the stone relief.`;
+      `house walls. If a wall cladding/material is also applied, tint/paint it toward this ` +
+      `color while keeping the surface relief.`;
   }
 
   // Цоколь — фото-референс (IMAGE {foundationIndex}) либо текст (fallback по hint)
@@ -377,19 +346,20 @@ export async function POST(req: NextRequest) {
       `upper sides of window frames. Small, symmetric, natural scale.`;
   }
 
-  // Термопанельные планки вокруг окон — фото-референс или fallback по hint.
+  // Термопанель — материал/фактура, наносимая на СТЕНЫ дома.
   if (termopanel && termopanelAsset) {
     prompt +=
-      `\n\nIMAGE ${termopanelIndex} shows a thin flat thermopanel plank trim. Add this plank ` +
-      `trim around every window of the house, matching the profile and white color from ` +
-      `IMAGE ${termopanelIndex}. Keep the window glass and existing frames unchanged, add only ` +
-      `the flat plank frame around the windows. Ignore background in IMAGE ${termopanelIndex}, ` +
-      `copy only the plank.`;
+      `\n\nIMAGE ${termopanelIndex} shows a thermopanel wall cladding texture. Cover ALL the ` +
+      `plaster/wall surfaces of the house in IMAGE 1 with this thermopanel material, matching ` +
+      `the texture, pattern and color from IMAGE ${termopanelIndex}. Apply it as the main wall ` +
+      `facade cladding. Keep windows, roof, doors and surroundings unchanged. Do NOT paste ` +
+      `IMAGE ${termopanelIndex} as a flat picture — use it as the wall material at realistic ` +
+      `scale. Ignore background in IMAGE ${termopanelIndex}, copy only the panel surface.`;
   } else if (termopanel) {
     prompt +=
-      `\n\nAdd a thin flat white thermopanel plank trim around every window of the house ` +
-      `(${termopanel.hint}). Keep the window glass and existing frames unchanged, add only ` +
-      `the flat plank frame around the windows.`;
+      `\n\nCover all the plaster/wall surfaces of the house with a thermopanel wall cladding ` +
+      `material (${termopanel.hint}). Apply it as the main wall facade cladding at realistic ` +
+      `scale. Keep windows, roof, doors and surroundings unchanged.`;
   }
 
   // Доп. инструкции пользователя
@@ -457,8 +427,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       image: outData,
       mimeType: outMime,
-      texture: textureMeta?.name ?? null,
-      usedReference: Boolean(texture),
     });
   } catch (err) {
     console.error("Visualize fatal:", err);

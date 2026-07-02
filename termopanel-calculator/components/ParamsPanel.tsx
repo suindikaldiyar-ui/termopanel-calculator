@@ -193,30 +193,27 @@ export default function ParamsPanel({
       {/* ── Фундамент + углы ── */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-muted">
-            Высота фундамента
-            <span className="ml-1 text-xs text-gold">· утепление 3 см</span>
-          </span>
+          <span className="text-sm font-medium text-muted">Площадь фундамента</span>
           <div className="relative">
             <input
               type="number"
               inputMode="decimal"
               min={0}
-              step={0.05}
+              step={0.1}
               value={
-                Number.isFinite(inputs.foundationHeight) && inputs.foundationHeight !== 0
-                  ? inputs.foundationHeight
+                Number.isFinite(inputs.foundationArea) && inputs.foundationArea !== 0
+                  ? inputs.foundationArea
                   : ""
               }
               placeholder="0"
               onChange={(e) => {
                 const n = Number(e.target.value);
-                onInputs({ ...inputs, foundationHeight: Number.isFinite(n) ? n : 0 });
+                onInputs({ ...inputs, foundationArea: Number.isFinite(n) ? n : 0 });
               }}
               className="tnum w-full rounded-xl border border-line bg-canvas px-3.5 py-2.5 pr-12 text-base font-semibold text-ink outline-none transition placeholder:text-muted/40 focus:border-gold focus:ring-2 focus:ring-gold/30"
             />
             <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-muted">
-              м
+              м²
             </span>
           </div>
         </label>

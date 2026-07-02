@@ -20,7 +20,7 @@ const INITIAL_INPUTS: CalcInputs = {
     { height: 3.4, length: 8.69 },
   ],
   openingList: Array.from({ length: 8 }, () => ({ width: 1.5, height: 1.5 })),
-  foundationHeight: 0.8,
+  foundationArea: 28,
   cornersMeters: 13.6,
 };
 

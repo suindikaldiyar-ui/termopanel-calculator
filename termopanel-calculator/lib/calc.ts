@@ -29,7 +29,7 @@ export interface OpeningItem {
 export interface CalcInputs {
   wallList: WallItem[]; // стены — каждая вводится отдельно
   openingList: OpeningItem[]; // окна/двери — каждое отдельно
-  foundationHeight: number; // высота фундамента, м (утепление 3 см)
+  foundationArea: number; // площадь фундамента, м² (вводится напрямую)
   cornersMeters: number; // углы, метраж (м), вводится вручную
 }
 
@@ -109,7 +109,7 @@ export function calculate(
 ): Estimate {
   const wallList = inputs.wallList ?? [];
   const openingList = inputs.openingList ?? [];
-  const foundationHeight = Math.max(0, inputs.foundationHeight || 0);
+  const foundationArea = Math.max(0, inputs.foundationArea || 0);
   const cornersMeters = Math.max(0, inputs.cornersMeters || 0);
   const windows = openingList.length; // кол-во окон = число строк списка
 
@@ -125,11 +125,10 @@ export function calculate(
     0
   );
 
-  // Периметр фундамента = сумма длин всех стен
+  // Периметр = сумма длин всех стен (используется в декоре-карнизе и КП)
   const perimeter = wallList.reduce((s, w) => s + Math.max(0, w.length || 0), 0);
 
   const panelArea = Math.max(0, wallArea - openingsArea);
-  const foundationArea = perimeter * foundationHeight;
   const totalArea = panelArea + foundationArea;
 
   const items: LineItem[] = [];
@@ -222,7 +221,7 @@ export function calculate(
     key: "foundation",
     name: "Фундамент",
     detail:
-      `${fmtNum(foundationArea)} м² (${fmtNum(perimeter)} м × ${fmtNum(foundationHeight)} м) · ` +
+      `${fmtNum(foundationArea)} м² · ` +
       `(${fmtNum(prices.foundationMaterialPerM2)} + ${fmtNum(prices.foundationPaintPerM2)}) тг/м²`,
     unitLabel: "тг/м²",
     unitPrice: foundationPerM2,

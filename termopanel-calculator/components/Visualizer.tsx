@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { TEXTURES, type Texture } from "@/lib/textures";
 import { FOUNDATIONS } from "@/lib/foundations";
 import { DECOR, DECOR_CATEGORY_LABEL } from "@/lib/decor";
 import { FRAMES } from "@/lib/frames";
@@ -26,7 +25,6 @@ export default function Visualizer({
   onDecorIds,
 }: Props) {
   const [source, setSource] = useState<CompressedImage | null>(null);
-  const [texture, setTexture] = useState<Texture>(TEXTURES[0]);
   const [frameId, setFrameId] = useState<string | null>(null);
   const [frameColor, setFrameColor] = useState<"white" | "yellow">("white");
   const [facadeColorId, setFacadeColorId] = useState<string>("none");
@@ -43,7 +41,6 @@ export default function Visualizer({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [failedTextures, setFailedTextures] = useState<Record<string, boolean>>({});
   const [failedImg, setFailedImg] = useState<Record<string, boolean>>({});
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -80,7 +77,6 @@ export default function Visualizer({
       body: JSON.stringify({
         image: source!.base64,
         mimeType: source!.mimeType,
-        textureId: texture.id,
         foundationId,
         decorIds,
         frameId,
@@ -135,7 +131,7 @@ export default function Visualizer({
   }
 
   function download() {
-    if (result) downloadUrl(result, `termopanel-${texture.id}.png`);
+    if (result) downloadUrl(result, "termopanel-facade.png");
   }
 
   // Загрузка картинки из data url в HTMLImageElement
@@ -308,45 +304,6 @@ export default function Visualizer({
             </button>
           )}
 
-          {/* Палитра травертина */}
-          <div>
-            <p className="mb-2 text-sm font-semibold text-ink">Цвет травертина</p>
-            <div className="grid grid-cols-3 gap-2">
-              {TEXTURES.map((t) => {
-                const active = t.id === texture.id;
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => setTexture(t)}
-                    className={`flex flex-col items-center gap-1.5 rounded-xl border p-2 transition ${
-                      active
-                        ? "border-terracotta ring-2 ring-terracotta/20"
-                        : "border-line hover:border-terracotta/40"
-                    }`}
-                  >
-                    {failedTextures[t.id] ? (
-                      <span
-                        className="h-12 w-full rounded-lg border border-black/5"
-                        style={{ background: t.swatch }}
-                      />
-                    ) : (
-                      <img
-                        src={t.image}
-                        alt={t.name}
-                        loading="lazy"
-                        onError={() =>
-                          setFailedTextures((prev) => ({ ...prev, [t.id]: true }))
-                        }
-                        className="h-12 w-full rounded-lg border border-black/5 object-cover"
-                      />
-                    )}
-                    <span className="text-xs font-medium text-ink">{t.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
 
           {/* Цвет фасада (краска стен) */}
           <div>
@@ -956,7 +913,7 @@ export default function Visualizer({
               <p className="text-sm">
                 {compareBrackets && bracketId
                   ? "Генерируем две версии фасада…"
-                  : `Подбираем травертин «${texture.name}»…`}
+                  : "Генерируем визуализацию фасада…"}
               </p>
             </div>
           ) : resultNo && resultYes ? (
