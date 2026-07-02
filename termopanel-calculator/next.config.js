@@ -10,6 +10,7 @@ const nextConfig = {
         "./public/textures/**",
         "./public/frames/**",
         "./public/foundations/**",
+        "./public/columns/**",
       ],
     },
   },

@@ -5,6 +5,7 @@ import { TEXTURES } from "@/lib/textures";
 import { getFoundation } from "@/lib/foundations";
 import { getDecor, type DecorItem } from "@/lib/decor";
 import { getFrame } from "@/lib/frames";
+import { getColumn } from "@/lib/columns";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -18,6 +19,7 @@ interface Body {
   foundationId?: string | null; // id отделки цоколя (null = без цоколя)
   decorIds?: string[]; // id выбранного декора (мультивыбор)
   frameId?: string | null; // id обрамления окон (null = без обрамления)
+  columnId?: string | null; // id угловой колонны (null = без колонн)
   withBrackets?: boolean; // кронштейны: true = с, false = без, undefined = без указания
   comment?: string; // доп. комментарий пользователя
 }
@@ -81,7 +83,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Некорректный запрос." }, { status: 400 });
   }
 
-  const { image, textureId, foundationId, decorIds, frameId, withBrackets, comment } = body;
+  const { image, textureId, foundationId, decorIds, frameId, columnId, withBrackets, comment } = body;
   const mimeType = body.mimeType || "image/jpeg";
 
   if (!image) {
@@ -137,6 +139,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Угловые колонны — фото-референс (если есть файл), иначе fallback по hint.
+  const column = getColumn(columnId);
+  let columnAsset: ImageAsset | null = null;
+  if (column) {
+    columnAsset = loadAssetFromDisk("columns", column.id);
+    if (!columnAsset) {
+      columnAsset = await loadAssetFromUrl("columns", column.id, getOrigin(req));
+    }
+  }
+
   const userComment = (comment || "").trim();
 
   // Референс-картинки по порядку: IMAGE 1 = дом, IMAGE 2 = материал стен,
@@ -149,6 +161,7 @@ export async function POST(req: NextRequest) {
   let imgCount = 2;
   let frameIndex = 0;
   let foundationIndex = 0;
+  let columnIndex = 0;
   if (frameAsset) {
     frameIndex = ++imgCount; // IMAGE 3 (или далее)
     imageParts.push({ inline_data: { mime_type: frameAsset.mimeType, data: frameAsset.data } });
@@ -156,6 +169,10 @@ export async function POST(req: NextRequest) {
   if (foundationAsset) {
     foundationIndex = ++imgCount; // следующий индекс после обрамления
     imageParts.push({ inline_data: { mime_type: foundationAsset.mimeType, data: foundationAsset.data } });
+  }
+  if (columnAsset) {
+    columnIndex = ++imgCount; // последний референс (после цоколя)
+    imageParts.push({ inline_data: { mime_type: columnAsset.mimeType, data: columnAsset.data } });
   }
 
   // Строгий промпт: цвет и рисунок берём СТРОГО из IMAGE 2.
@@ -207,6 +224,21 @@ export async function POST(req: NextRequest) {
       `\n\nAdd decorative window trim around EVERY window of the house: ${frame.hint}. ` +
       `Keep it white/cream, realistic scale. Only add the frame around each window — ` +
       `do not cover or change the window glass.`;
+  }
+
+  // Угловые колонны — по фото-референсу (IMAGE {columnIndex}) или по тексту (fallback).
+  if (column && columnAsset) {
+    prompt +=
+      `\n\nIMAGE ${columnIndex} shows a decorative corner column/pilaster. Apply this exact ` +
+      `column design to the OUTER CORNERS of the house (vertical columns covering the building ` +
+      `corners), matching the panels, capital and color from IMAGE ${columnIndex}. Keep the wall ` +
+      `travertine and windows unchanged. Place columns ONLY on the building corners, ` +
+      `not on windows. Ignore background in IMAGE ${columnIndex}, copy only the column.`;
+  } else if (column) {
+    prompt +=
+      `\n\nAdd decorative corner columns/pilasters on the OUTER CORNERS of the house: ${column.hint}. ` +
+      `Place them ONLY on the building corners, not on windows. Keep the wall travertine ` +
+      `and windows unchanged. White/cream, realistic scale.`;
   }
 
   // Кронштейны — две версии рендера (для сравнения)
