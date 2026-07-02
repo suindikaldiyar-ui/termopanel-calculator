@@ -9,6 +9,7 @@ import { getColumn } from "@/lib/columns";
 import { getBelt } from "@/lib/belts";
 import { getBracket } from "@/lib/brackets";
 import { getTermopanel } from "@/lib/termopanels";
+import { getFacadeColor } from "@/lib/facadecolors";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -22,6 +23,8 @@ interface Body {
   foundationId?: string | null; // id отделки цоколя (null = без цоколя)
   decorIds?: string[]; // id выбранного декора (мультивыбор)
   frameId?: string | null; // id обрамления окон (null = без обрамления)
+  frameColor?: string; // цвет обрамления: "white" | "yellow"
+  facadeColorId?: string | null; // id цвета краски фасада (none = как есть)
   columnId?: string | null; // id угловой колонны (null = без колонн)
   beltId?: string | null; // id межэтажного пояса (null = без пояса)
   bracketId?: string | null; // id кронштейна (null = без кронштейна)
@@ -62,6 +65,20 @@ async function loadAssetFromUrl(
   }
 }
 
+// Диск → URL-фолбэк одной функцией.
+async function loadAsset(
+  folder: string,
+  id: string,
+  origin: string | null
+): Promise<ImageAsset | null> {
+  const disk = loadAssetFromDisk(folder, id);
+  if (disk) return disk;
+  return await loadAssetFromUrl(folder, id, origin);
+}
+
+// basename без расширения: "/frames/set-side.jpg" → "set-side"
+const baseId = (p: string) => p.split("/").pop()!.replace(/\.jpg$/i, "");
+
 // Определяем публичный origin запроса (для фолбэка)
 function getOrigin(req: NextRequest): string | null {
   const host = req.headers.get("host");
@@ -88,8 +105,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Некорректный запрос." }, { status: 400 });
   }
 
-  const { image, textureId, foundationId, decorIds, frameId, columnId, beltId, bracketId, termopanelId, comment } = body;
+  const { image, textureId, foundationId, decorIds, frameId, frameColor, facadeColorId, columnId, beltId, bracketId, termopanelId, comment } = body;
   const mimeType = body.mimeType || "image/jpeg";
+  const frameColorText = frameColor === "yellow" ? "warm yellow/sand" : "white";
 
   if (!image) {
     return NextResponse.json(
@@ -134,14 +152,20 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Обрамление окон — фото-референс (если есть файл), иначе fallback по hint.
+  // Обрамление окон — одиночный референс ИЛИ комплект из 3 профилей.
   const frame = getFrame(frameId);
+  const origin = getOrigin(req);
   let frameAsset: ImageAsset | null = null;
-  if (frame) {
-    frameAsset = loadAssetFromDisk("frames", frame.id);
-    if (!frameAsset) {
-      frameAsset = await loadAssetFromUrl("frames", frame.id, getOrigin(req));
-    }
+  let frameSet: { side: ImageAsset; top: ImageAsset; bottom: ImageAsset } | null = null;
+  if (frame?.setImages) {
+    const [s, t, b] = await Promise.all([
+      loadAsset("frames", baseId(frame.setImages.side), origin),
+      loadAsset("frames", baseId(frame.setImages.top), origin),
+      loadAsset("frames", baseId(frame.setImages.bottom), origin),
+    ]);
+    if (s && t && b) frameSet = { side: s, top: t, bottom: b };
+  } else if (frame) {
+    frameAsset = await loadAsset("frames", frame.id, origin);
   }
 
   // Угловые колонны — фото-референс (если есть файл), иначе fallback по hint.
@@ -195,10 +219,21 @@ export async function POST(req: NextRequest) {
   ];
   let imgCount = 2;
   let frameIndex = 0;
+  let sideIndex = 0;
+  let topIndex = 0;
+  let bottomIndex = 0;
   let foundationIndex = 0;
   let columnIndex = 0;
   let beltIndex = 0;
-  if (frameAsset) {
+  if (frameSet) {
+    // комплект = 3 картинки: боковой, верхний, нижний
+    sideIndex = ++imgCount;
+    imageParts.push({ inline_data: { mime_type: frameSet.side.mimeType, data: frameSet.side.data } });
+    topIndex = ++imgCount;
+    imageParts.push({ inline_data: { mime_type: frameSet.top.mimeType, data: frameSet.top.data } });
+    bottomIndex = ++imgCount;
+    imageParts.push({ inline_data: { mime_type: frameSet.bottom.mimeType, data: frameSet.bottom.data } });
+  } else if (frameAsset) {
     frameIndex = ++imgCount; // IMAGE 3 (или далее)
     imageParts.push({ inline_data: { mime_type: frameAsset.mimeType, data: frameAsset.data } });
   }
@@ -239,6 +274,15 @@ export async function POST(req: NextRequest) {
     `the veranda/porch structure, railings, stairs, roof, sky, ground, plants and ` +
     `background. Same camera angle. Photorealistic, natural daylight, high quality.`;
 
+  // Краска фасада — цвет стен (поверх/вместе с текстурой)
+  const facadeColor = getFacadeColor(facadeColorId);
+  if (facadeColor?.hint) {
+    prompt +=
+      `\n\nPaint the facade walls in ${facadeColor.hint}. Apply this wall color across the ` +
+      `house walls. If a travertine texture is also applied, tint/paint it toward this color ` +
+      `while keeping the stone relief.`;
+  }
+
   // Цоколь — фото-референс (IMAGE {foundationIndex}) либо текст (fallback по hint)
   if (foundation && foundationAsset) {
     prompt +=
@@ -263,19 +307,26 @@ export async function POST(req: NextRequest) {
       `Render them realistically at natural scale.`;
   }
 
-  // Обрамление окон — по фото-референсу (IMAGE {frameIndex}) или по тексту (fallback).
-  if (frame && frameAsset) {
+  // Обрамление окон — комплект из 3 профилей, одиночный референс, или текст (fallback).
+  if (frame && frameSet) {
     prompt +=
-      `\n\nAdd the same window trim as shown in IMAGE ${frameIndex} around every window. The trim ` +
-      `color MUST be ${frame.color} — do NOT make it white if the reference is dark. ` +
-      `Replicate the EXACT profile, shape and COLOR from IMAGE ${frameIndex}. IMPORTANT: ignore ` +
-      `the window glass, curtains and interior visible in IMAGE ${frameIndex} — copy ONLY the ` +
-      `decorative trim frame (surround, pilasters, cornice, sill), not the glass or ` +
-      `what is behind it. Keep the house's own windows and glass from IMAGE 1 unchanged.`;
+      `\n\nThese reference images show a window trim SET: IMAGE ${sideIndex} = side molding, ` +
+      `IMAGE ${topIndex} = top cornice, IMAGE ${bottomIndex} = bottom sill. Apply ALL THREE ` +
+      `around every window — side moldings on left/right, cornice on top, sill at the bottom — ` +
+      `forming a complete classic frame. Color of the trim: ${frameColorText}. ` +
+      `Keep window glass unchanged.`;
+  } else if (frame && frameAsset) {
+    prompt +=
+      `\n\nAdd the same window trim as shown in IMAGE ${frameIndex} around every window. ` +
+      `Replicate the EXACT profile and shape from IMAGE ${frameIndex}. The trim color MUST be ` +
+      `${frameColorText}. IMPORTANT: ignore the window glass, curtains and interior visible in ` +
+      `IMAGE ${frameIndex} — copy ONLY the decorative trim frame (surround, pilasters, cornice, ` +
+      `sill), not the glass or what is behind it. Keep the house's own windows and glass from ` +
+      `IMAGE 1 unchanged.`;
   } else if (frame) {
     prompt +=
       `\n\nAdd decorative window trim around EVERY window of the house: ${frame.hint}. ` +
-      `Keep it white/cream, realistic scale. Only add the frame around each window — ` +
+      `Trim color: ${frameColorText}. Realistic scale. Only add the frame around each window — ` +
       `do not cover or change the window glass.`;
   }
 

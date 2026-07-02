@@ -9,6 +9,7 @@ import { COLUMNS } from "@/lib/columns";
 import { BELTS } from "@/lib/belts";
 import { BRACKETS } from "@/lib/brackets";
 import { TERMOPANELS } from "@/lib/termopanels";
+import { FACADE_COLORS } from "@/lib/facadecolors";
 import { compressImage, type CompressedImage } from "@/lib/image";
 
 interface Props {
@@ -27,6 +28,8 @@ export default function Visualizer({
   const [source, setSource] = useState<CompressedImage | null>(null);
   const [texture, setTexture] = useState<Texture>(TEXTURES[0]);
   const [frameId, setFrameId] = useState<string | null>(null);
+  const [frameColor, setFrameColor] = useState<"white" | "yellow">("white");
+  const [facadeColorId, setFacadeColorId] = useState<string>("none");
   const [columnId, setColumnId] = useState<string | null>(null);
   const [beltId, setBeltId] = useState<string | null>(null);
   const [bracketId, setBracketId] = useState<string | null>(null);
@@ -81,6 +84,8 @@ export default function Visualizer({
         foundationId,
         decorIds,
         frameId,
+        frameColor,
+        facadeColorId,
         columnId,
         beltId,
         bracketId: bId,
@@ -343,6 +348,36 @@ export default function Visualizer({
             </div>
           </div>
 
+          {/* Цвет фасада (краска стен) */}
+          <div>
+            <p className="mb-2 text-sm font-semibold text-ink">Цвет фасада</p>
+            <div className="grid grid-cols-3 gap-2">
+              {FACADE_COLORS.map((c) => {
+                const active = c.id === facadeColorId;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setFacadeColorId(c.id)}
+                    className={`flex flex-col items-center gap-1.5 rounded-xl border p-2 transition ${
+                      active
+                        ? "border-gold ring-2 ring-gold/30"
+                        : "border-line hover:border-gold/40"
+                    }`}
+                  >
+                    <span
+                      className="h-8 w-8 rounded-full border border-black/10"
+                      style={{ background: c.swatch }}
+                    />
+                    <span className="text-xs font-medium leading-tight text-ink">
+                      {c.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Выбор цоколя / фундамента */}
           <div>
             <p className="mb-2 text-sm font-semibold text-ink">Цоколь / фундамент</p>
@@ -525,12 +560,43 @@ export default function Visualizer({
                         className="h-8 w-8 shrink-0 rounded-lg border border-black/10 object-cover"
                       />
                     )}
-                    <span className="text-xs font-medium leading-tight text-ink">
-                      {f.name}
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs font-medium leading-tight text-ink">
+                        {f.name}
+                      </span>
+                      {f.setImages && (
+                        <span className="block text-[10px] text-gold">комплект · 3 профиля</span>
+                      )}
                     </span>
                   </button>
                 );
               })}
+            </div>
+
+            {/* Цвет обрамления */}
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-xs text-muted">Цвет:</span>
+              {([
+                { id: "white", name: "Белый", sw: "#F2EFE9" },
+                { id: "yellow", name: "Жёлтый", sw: "#E8D08A" },
+              ] as const).map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setFrameColor(c.id)}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition ${
+                    frameColor === c.id
+                      ? "border-gold ring-2 ring-gold/30 text-ink"
+                      : "border-line text-muted hover:border-gold/40"
+                  }`}
+                >
+                  <span
+                    className="h-3.5 w-3.5 rounded-full border border-black/10"
+                    style={{ background: c.sw }}
+                  />
+                  {c.name}
+                </button>
+              ))}
             </div>
           </div>
 

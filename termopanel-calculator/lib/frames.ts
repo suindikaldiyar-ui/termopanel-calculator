@@ -2,9 +2,12 @@
 export type FrameItem = {
   id: string;
   name: string;
-  image: string; // "/frames/{id}.jpg" — фото установленного обрамления (референс)
+  image: string; // "/frames/{id}.jpg" — превью (для комплекта = боковой профиль)
   hint: string; // текст-подсказка для Gemini
-  color: string; // цвет обрамления (человекочит.) — для промпта
+  color: string; // цвет обрамления по умолчанию (человекочит.) — для промпта
+  // Комплект из 3 профилей вокруг окна (боковой/верхний/нижний). Если задан —
+  // это обрамление-комплект, а не одиночный референс.
+  setImages?: { side: string; top: string; bottom: string };
 };
 
 export const FRAMES: FrameItem[] = [
@@ -28,6 +31,18 @@ export const FRAMES: FrameItem[] = [
     image: "/frames/frame3.jpg",
     hint: "classic window trim, like the reference photo",
     color: "white",
+  },
+  {
+    id: "set-classic",
+    name: "Классика (комплект)",
+    image: "/frames/set-side.jpg",
+    color: "white",
+    setImages: {
+      side: "/frames/set-side.jpg",
+      top: "/frames/set-top.jpg",
+      bottom: "/frames/set-bottom.jpg",
+    },
+    hint: "classic white window trim set: side molding, top cornice and bottom sill around the window",
   },
 ];
 
