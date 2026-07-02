@@ -8,6 +8,7 @@ import { FRAMES } from "@/lib/frames";
 import { COLUMNS } from "@/lib/columns";
 import { BELTS } from "@/lib/belts";
 import { BRACKETS } from "@/lib/brackets";
+import { TERMOPANELS } from "@/lib/termopanels";
 import { compressImage, type CompressedImage } from "@/lib/image";
 
 interface Props {
@@ -29,6 +30,7 @@ export default function Visualizer({
   const [columnId, setColumnId] = useState<string | null>(null);
   const [beltId, setBeltId] = useState<string | null>(null);
   const [bracketId, setBracketId] = useState<string | null>(null);
+  const [termopanelId, setTermopanelId] = useState<string | null>(null);
   const [comment, setComment] = useState("");
   const [compareBrackets, setCompareBrackets] = useState(false);
   const [result, setResult] = useState<string | null>(null); // data url «ПОСЛЕ» (обычный режим)
@@ -82,6 +84,7 @@ export default function Visualizer({
         columnId,
         beltId,
         bracketId: bId,
+        termopanelId,
         comment: comment.trim(),
       }),
     });
@@ -529,6 +532,79 @@ export default function Visualizer({
                 );
               })}
             </div>
+          </div>
+
+          {/* Термопанель (планки вокруг окон, по фото-референсу) */}
+          <div>
+            <p className="mb-2 text-sm font-semibold text-ink">Термопанель</p>
+            {TERMOPANELS.length === 0 ? (
+              <ComingSoon />
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {/* «Без термопанели» — всегда */}
+                <button
+                  type="button"
+                  onClick={() => setTermopanelId(null)}
+                  className={`flex items-center gap-2 rounded-xl border p-2 text-left transition ${
+                    termopanelId === null
+                      ? "border-gold ring-2 ring-gold/30"
+                      : "border-line hover:border-gold/40"
+                  }`}
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line text-muted">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="9" />
+                      <path d="m5 5 14 14" />
+                    </svg>
+                  </span>
+                  <span className="text-xs font-medium leading-tight text-ink">
+                    Без термопанели
+                  </span>
+                </button>
+
+                {TERMOPANELS.map((t) => {
+                  const active = t.id === termopanelId;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setTermopanelId(t.id)}
+                      className={`flex items-center gap-2 rounded-xl border p-2 text-left transition ${
+                        active
+                          ? "border-gold ring-2 ring-gold/30"
+                          : "border-line hover:border-gold/40"
+                      }`}
+                    >
+                      {failedImg[t.image] ? (
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line text-muted">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <circle cx="9" cy="9" r="2" />
+                            <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                          </svg>
+                        </span>
+                      ) : (
+                        <img
+                          src={t.image}
+                          alt={t.name}
+                          loading="lazy"
+                          onError={() =>
+                            setFailedImg((p) => ({ ...p, [t.image]: true }))
+                          }
+                          className="h-8 w-8 shrink-0 rounded-lg border border-black/10 object-cover"
+                        />
+                      )}
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-medium leading-tight text-ink">
+                          {t.name}
+                        </span>
+                        <span className="block text-[10px] text-muted">{t.size}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Угловые колонны (по фото-референсу) */}

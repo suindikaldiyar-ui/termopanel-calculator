@@ -29,20 +29,6 @@ export const FRAMES: FrameItem[] = [
     hint: "classic window trim, like the reference photo",
     color: "white",
   },
-  {
-    id: "frame4",
-    name: "Термопанель КА-25",
-    image: "/frames/frame4.jpg",
-    color: "white",
-    hint: "flat thin white thermopanel plank trim around the window, like the reference image",
-  },
-  {
-    id: "frame5",
-    name: "Термопанель КА-26",
-    image: "/frames/frame5.jpg",
-    color: "white",
-    hint: "flat thin white thermopanel plank trim around the window, like the reference image",
-  },
 ];
 
 export const getFrame = (id?: string | null) =>

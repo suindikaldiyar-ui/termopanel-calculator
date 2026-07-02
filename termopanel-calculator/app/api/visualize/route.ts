@@ -8,6 +8,7 @@ import { getFrame } from "@/lib/frames";
 import { getColumn } from "@/lib/columns";
 import { getBelt } from "@/lib/belts";
 import { getBracket } from "@/lib/brackets";
+import { getTermopanel } from "@/lib/termopanels";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -24,6 +25,7 @@ interface Body {
   columnId?: string | null; // id угловой колонны (null = без колонн)
   beltId?: string | null; // id межэтажного пояса (null = без пояса)
   bracketId?: string | null; // id кронштейна (null = без кронштейна)
+  termopanelId?: string | null; // id термопанельной планки (null = без)
   comment?: string; // доп. комментарий пользователя
 }
 
@@ -86,7 +88,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Некорректный запрос." }, { status: 400 });
   }
 
-  const { image, textureId, foundationId, decorIds, frameId, columnId, beltId, bracketId, comment } = body;
+  const { image, textureId, foundationId, decorIds, frameId, columnId, beltId, bracketId, termopanelId, comment } = body;
   const mimeType = body.mimeType || "image/jpeg";
 
   if (!image) {
@@ -172,6 +174,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Термопанельные планки вокруг окон — фото-референс (иначе fallback по hint).
+  const termopanel = getTermopanel(termopanelId);
+  let termopanelAsset: ImageAsset | null = null;
+  if (termopanel) {
+    termopanelAsset = loadAssetFromDisk("termopanels", termopanel.id);
+    if (!termopanelAsset) {
+      termopanelAsset = await loadAssetFromUrl("termopanels", termopanel.id, getOrigin(req));
+    }
+  }
+
   const userComment = (comment || "").trim();
 
   // Референс-картинки по порядку: IMAGE 1 = дом, IMAGE 2 = материал стен,
@@ -204,8 +216,13 @@ export async function POST(req: NextRequest) {
   }
   let bracketIndex = 0;
   if (bracketAsset) {
-    bracketIndex = ++imgCount; // последний референс (после пояса)
+    bracketIndex = ++imgCount; // после пояса
     imageParts.push({ inline_data: { mime_type: bracketAsset.mimeType, data: bracketAsset.data } });
+  }
+  let termopanelIndex = 0;
+  if (termopanelAsset) {
+    termopanelIndex = ++imgCount; // последний референс (после кронштейна)
+    imageParts.push({ inline_data: { mime_type: termopanelAsset.mimeType, data: termopanelAsset.data } });
   }
 
   // Строгий промпт: цвет и рисунок берём СТРОГО из IMAGE 2.
@@ -307,6 +324,21 @@ export async function POST(req: NextRequest) {
       `window trim — where the side pilasters meet the top cornice, left and right of every ` +
       `window. Do NOT place them under the roof, on walls or building corners — ONLY at the ` +
       `upper sides of window frames. Small, symmetric, natural scale.`;
+  }
+
+  // Термопанельные планки вокруг окон — фото-референс или fallback по hint.
+  if (termopanel && termopanelAsset) {
+    prompt +=
+      `\n\nIMAGE ${termopanelIndex} shows a thin flat thermopanel plank trim. Add this plank ` +
+      `trim around every window of the house, matching the profile and white color from ` +
+      `IMAGE ${termopanelIndex}. Keep the window glass and existing frames unchanged, add only ` +
+      `the flat plank frame around the windows. Ignore background in IMAGE ${termopanelIndex}, ` +
+      `copy only the plank.`;
+  } else if (termopanel) {
+    prompt +=
+      `\n\nAdd a thin flat white thermopanel plank trim around every window of the house ` +
+      `(${termopanel.hint}). Keep the window glass and existing frames unchanged, add only ` +
+      `the flat plank frame around the windows.`;
   }
 
   // Доп. инструкции пользователя

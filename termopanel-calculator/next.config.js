@@ -13,6 +13,7 @@ const nextConfig = {
         "./public/columns/**",
         "./public/belts/**",
         "./public/brackets/**",
+        "./public/termopanels/**",
       ],
     },
   },
