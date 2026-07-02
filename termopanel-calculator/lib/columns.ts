@@ -20,6 +20,24 @@ export const COLUMNS: ColumnItem[] = [
     image: "/columns/column2.jpg",
     hint: "white fluted classic corner column with vertical grooves and a base at the bottom, like the reference image",
   },
+  {
+    id: "column3",
+    name: "КА-36",
+    image: "/columns/column3.jpg",
+    hint: "white classic corner column/pilaster with horizontal rectangular panels, like the reference image",
+  },
+  {
+    id: "column4",
+    name: "КА-37",
+    image: "/columns/column4.jpg",
+    hint: "white fluted corner column/pilaster with vertical grooves and horizontal panels, like the reference image",
+  },
+  {
+    id: "column5",
+    name: "КА-39",
+    image: "/columns/column5.jpg",
+    hint: "white classic corner column/pilaster with panel sections, like the reference image",
+  },
 ];
 
 export const getColumn = (id?: string | null) =>
