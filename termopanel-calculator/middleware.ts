@@ -21,6 +21,9 @@ export async function middleware(req: NextRequest) {
 }
 
 // Исключаем страницу входа, её API и всю статику — иначе цикл редиректов.
+// ВАЖНО: /api/visualize НЕ исключён — он за паролем (без cookie → редирект на
+// /login, Gemini не вызывается). Это основная защита API; rate limit в самом
+// роуте — вторая линия на случай утечки cookie/сессии.
 export const config = {
   matcher: [
     "/((?!login|api/login|_next/static|_next/image|textures|logo.png|favicon.ico|robots.txt|sitemap.xml).*)",

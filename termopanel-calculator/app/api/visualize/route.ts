@@ -9,11 +9,23 @@ import { getBelt } from "@/lib/belts";
 import { getBracket } from "@/lib/brackets";
 import { getTermopanel } from "@/lib/termopanels";
 import { getFacadeColor } from "@/lib/facadecolors";
+import { getClientIp, rateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image";
+const MAX_IMAGE_CHARS = 8 * 1024 * 1024; // ~8 МБ base64 — серверный предел
+
+// Предупреждение при старте, если ключ не задан (билд не роняем).
+if (!process.env.GEMINI_API_KEY) {
+  console.warn("[security] GEMINI_API_KEY не задан — визуализация работать не будет.");
+}
+
+// id из каталога: только [a-z0-9-]. Иначе null (не падаем, игнорируем).
+function cleanId(id?: string | null): string | null {
+  return typeof id === "string" && /^[a-z0-9-]+$/.test(id) ? id : null;
+}
 
 interface Body {
   image?: string; // фото дома, base64 (без префикса data:)
@@ -88,12 +100,23 @@ function getOrigin(req: NextRequest): string | null {
 }
 
 export async function POST(req: NextRequest) {
+  // Rate limit: не более 10 запросов с одного IP за 60 сек (защита Gemini-денег).
+  const rl = rateLimit(`visualize:${getClientIp(req)}`, 10, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: "Слишком много запросов, подождите" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } }
+    );
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return NextResponse.json(
-      { error: "Не настроен GEMINI_API_KEY. Добавьте ключ в .env.local." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Сервис недоступен." }, { status: 500 });
+  }
+
+  // Только JSON.
+  if (!(req.headers.get("content-type") || "").includes("application/json")) {
+    return NextResponse.json({ error: "Некорректный запрос." }, { status: 400 });
   }
 
   let body: Body;
@@ -103,8 +126,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Некорректный запрос." }, { status: 400 });
   }
 
-  const { image, foundationId, decorIds, frameId, frameColor, facadeColorId, columnId, beltId, bracketId, termopanelId, comment } = body;
-  const mimeType = body.mimeType || "image/jpeg";
+  const { image, frameColor, comment } = body;
+
+  // image обязателен, должен быть строкой base64.
+  if (typeof image !== "string" || !/^[A-Za-z0-9+/=\s]+$/.test(image) || image.length < 8) {
+    return NextResponse.json(
+      { error: "Не передано изображение дома." },
+      { status: 400 }
+    );
+  }
+  // Серверный предел размера (доп. к клиентскому сжатию).
+  if (image.length > MAX_IMAGE_CHARS) {
+    return NextResponse.json({ error: "Файл слишком большой" }, { status: 413 });
+  }
+
+  // id — только из каталогов и только [a-z0-9-]; иначе игнорируем.
+  const foundationId = cleanId(body.foundationId);
+  const frameId = cleanId(body.frameId);
+  const facadeColorId = cleanId(body.facadeColorId);
+  const columnId = cleanId(body.columnId);
+  const beltId = cleanId(body.beltId);
+  const bracketId = cleanId(body.bracketId);
+  const termopanelId = cleanId(body.termopanelId);
+  const decorIds = Array.isArray(body.decorIds)
+    ? (body.decorIds.map(cleanId).filter(Boolean) as string[])
+    : [];
+
+  const mimeType =
+    typeof body.mimeType === "string" && /^image\/[a-z0-9.+-]+$/i.test(body.mimeType)
+      ? body.mimeType
+      : "image/jpeg";
   // Цвет обрамления: none = не форсировать (берётся из референс-фото).
   const frameColorText =
     frameColor === "white" ? "white" : frameColor === "beige" ? "beige/cream" : null;
@@ -113,13 +164,6 @@ export async function POST(req: NextRequest) {
     ? ` The trim color MUST be ${frameColorText}.`
     : ` Keep the trim color exactly as shown in the reference image.`;
   const trimColorHint = frameColorText ? ` Trim color: ${frameColorText}.` : "";
-
-  if (!image) {
-    return NextResponse.json(
-      { error: "Не передано изображение дома." },
-      { status: 400 }
-    );
-  }
 
   const foundation = getFoundation(foundationId);
   const decors = (decorIds ?? [])
