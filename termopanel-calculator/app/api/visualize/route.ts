@@ -349,12 +349,15 @@ export async function POST(req: NextRequest) {
   // Термопанель — материал/фактура, наносимая на СТЕНЫ дома.
   if (termopanel && termopanelAsset) {
     prompt +=
-      `\n\nIMAGE ${termopanelIndex} shows a thermopanel wall cladding texture. Cover ALL the ` +
-      `plaster/wall surfaces of the house in IMAGE 1 with this thermopanel material, matching ` +
-      `the texture, pattern and color from IMAGE ${termopanelIndex}. Apply it as the main wall ` +
-      `facade cladding. Keep windows, roof, doors and surroundings unchanged. Do NOT paste ` +
-      `IMAGE ${termopanelIndex} as a flat picture — use it as the wall material at realistic ` +
-      `scale. Ignore background in IMAGE ${termopanelIndex}, copy only the panel surface.`;
+      `\n\nIMAGE ${termopanelIndex} shows a thermopanel facade cladding material (its texture, ` +
+      `color and surface pattern). Use it as the MAIN WALL MATERIAL: cover the ENTIRE facade ` +
+      `wall surface of the house in IMAGE 1 with this thermopanel, completely replacing the ` +
+      `existing brick or plaster. The panels install as large horizontal blocks across the ` +
+      `whole wall — apply the texture and color from IMAGE ${termopanelIndex} at realistic ` +
+      `architectural scale over all wall areas. Keep windows, roof, doors, balcony, stairs and ` +
+      `surroundings exactly as in IMAGE 1. This is full facade wall cladding, not a small ` +
+      `insert — the whole wall must be covered. Ignore any background in IMAGE ${termopanelIndex}, ` +
+      `copy only the panel material.`;
   } else if (termopanel) {
     prompt +=
       `\n\nCover all the plaster/wall surfaces of the house with a thermopanel wall cladding ` +
