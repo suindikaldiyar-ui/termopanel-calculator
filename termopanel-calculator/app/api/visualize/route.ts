@@ -105,7 +105,14 @@ export async function POST(req: NextRequest) {
 
   const { image, foundationId, decorIds, frameId, frameColor, facadeColorId, columnId, beltId, bracketId, termopanelId, comment } = body;
   const mimeType = body.mimeType || "image/jpeg";
-  const frameColorText = frameColor === "yellow" ? "warm yellow/sand" : "white";
+  // Цвет обрамления: none = не форсировать (берётся из референс-фото).
+  const frameColorText =
+    frameColor === "white" ? "white" : frameColor === "beige" ? "beige/cream" : null;
+  // Фраза про цвет для веток с фото-референсом и для текстового fallback.
+  const trimColorRef = frameColorText
+    ? ` The trim color MUST be ${frameColorText}.`
+    : ` Keep the trim color exactly as shown in the reference image.`;
+  const trimColorHint = frameColorText ? ` Trim color: ${frameColorText}.` : "";
 
   if (!image) {
     return NextResponse.json(
@@ -282,20 +289,18 @@ export async function POST(req: NextRequest) {
       `\n\nThese reference images show a window trim SET: IMAGE ${sideIndex} = side molding, ` +
       `IMAGE ${topIndex} = top cornice, IMAGE ${bottomIndex} = bottom sill. Apply ALL THREE ` +
       `around every window — side moldings on left/right, cornice on top, sill at the bottom — ` +
-      `forming a complete classic frame. Color of the trim: ${frameColorText}. ` +
-      `Keep window glass unchanged.`;
+      `forming a complete classic frame.${trimColorRef} Keep window glass unchanged.`;
   } else if (frame && frameAsset) {
     prompt +=
       `\n\nAdd the same window trim as shown in IMAGE ${frameIndex} around every window. ` +
-      `Replicate the EXACT profile and shape from IMAGE ${frameIndex}. The trim color MUST be ` +
-      `${frameColorText}. IMPORTANT: ignore the window glass, curtains and interior visible in ` +
-      `IMAGE ${frameIndex} — copy ONLY the decorative trim frame (surround, pilasters, cornice, ` +
-      `sill), not the glass or what is behind it. Keep the house's own windows and glass from ` +
-      `IMAGE 1 unchanged.`;
+      `Replicate the EXACT profile and shape from IMAGE ${frameIndex}.${trimColorRef} IMPORTANT: ` +
+      `ignore the window glass, curtains and interior visible in IMAGE ${frameIndex} — copy ONLY ` +
+      `the decorative trim frame (surround, pilasters, cornice, sill), not the glass or what is ` +
+      `behind it. Keep the house's own windows and glass from IMAGE 1 unchanged.`;
   } else if (frame) {
     prompt +=
-      `\n\nAdd decorative window trim around EVERY window of the house: ${frame.hint}. ` +
-      `Trim color: ${frameColorText}. Realistic scale. Only add the frame around each window — ` +
+      `\n\nAdd decorative window trim around EVERY window of the house: ${frame.hint}.` +
+      `${trimColorHint} Realistic scale. Only add the frame around each window — ` +
       `do not cover or change the window glass.`;
   }
 

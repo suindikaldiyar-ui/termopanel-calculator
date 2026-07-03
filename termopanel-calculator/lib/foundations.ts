@@ -30,8 +30,8 @@ export const FOUNDATIONS: FoundationItem[] = [
     id: "fb17",
     name: "Термоплитка ФБ-17",
     image: "/foundations/fb17.jpg",
-    swatch: "#5A4A42",
-    hint: "brown-grey natural flagstone/boulder-look tile plinth panels, irregular stone pattern, like the reference photo",
+    swatch: "#3A322E",
+    hint: "dark brown glossy boulder/flagstone plinth panels, irregular stone pattern, dark charcoal-brown color, keep it dark like the reference photo",
     pricePerM: 0,
   },
 ];

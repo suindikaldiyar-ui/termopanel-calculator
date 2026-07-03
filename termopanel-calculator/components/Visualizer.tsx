@@ -26,7 +26,7 @@ export default function Visualizer({
 }: Props) {
   const [source, setSource] = useState<CompressedImage | null>(null);
   const [frameId, setFrameId] = useState<string | null>(null);
-  const [frameColor, setFrameColor] = useState<"white" | "yellow">("white");
+  const [frameColor, setFrameColor] = useState<"none" | "white" | "beige">("none");
   const [facadeColorId, setFacadeColorId] = useState<string>("none");
   const [columnId, setColumnId] = useState<string | null>(null);
   const [beltId, setBeltId] = useState<string | null>(null);
@@ -531,11 +531,12 @@ export default function Visualizer({
             </div>
 
             {/* Цвет обрамления */}
-            <div className="mt-2 flex items-center gap-2">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted">Цвет:</span>
               {([
+                { id: "none", name: "Без цвета", sw: null },
                 { id: "white", name: "Белый", sw: "#F2EFE9" },
-                { id: "yellow", name: "Жёлтый", sw: "#E8D08A" },
+                { id: "beige", name: "Бежевый", sw: "#E8D08A" },
               ] as const).map((c) => (
                 <button
                   key={c.id}
@@ -547,10 +548,19 @@ export default function Visualizer({
                       : "border-line text-muted hover:border-gold/40"
                   }`}
                 >
-                  <span
-                    className="h-3.5 w-3.5 rounded-full border border-black/10"
-                    style={{ background: c.sw }}
-                  />
+                  {c.sw ? (
+                    <span
+                      className="h-3.5 w-3.5 rounded-full border border-black/10"
+                      style={{ background: c.sw }}
+                    />
+                  ) : (
+                    <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-line text-muted">
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="m5 5 14 14" />
+                      </svg>
+                    </span>
+                  )}
                   {c.name}
                 </button>
               ))}
