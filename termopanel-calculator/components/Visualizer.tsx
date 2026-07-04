@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FOUNDATIONS } from "@/lib/foundations";
 import { DECOR, DECOR_CATEGORY_LABEL } from "@/lib/decor";
 import { FRAMES } from "@/lib/frames";
@@ -995,28 +995,17 @@ export default function Visualizer({
             </div>
           ) : result ? (
             <div className="flex flex-1 flex-col">
-              {/* ДО / ПОСЛЕ */}
-              <div className="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
-                <div className="relative overflow-hidden rounded-lg">
-                  <img
-                    src={beforeUrl ?? undefined}
-                    alt="До"
-                    className="h-full w-full rounded-lg object-contain"
-                  />
-                  <span className="absolute bottom-2 left-2 rounded-md bg-black/55 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
-                    До
-                  </span>
-                </div>
-                <div className="relative overflow-hidden rounded-lg">
+              {/* ДО / ПОСЛЕ — интерактивный слайдер сравнения */}
+              <div className="flex-1">
+                {beforeUrl ? (
+                  <BeforeAfterSlider before={beforeUrl} after={result} />
+                ) : (
                   <img
                     src={result}
                     alt="После"
                     className="h-full w-full rounded-lg object-contain"
                   />
-                  <span className="absolute bottom-2 left-2 rounded-md bg-black/55 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
-                    После
-                  </span>
-                </div>
+                )}
               </div>
 
               {/* Кнопки скачивания */}
@@ -1059,6 +1048,99 @@ export default function Visualizer({
         </div>
       </div>
     </section>
+  );
+}
+
+// Интерактивный слайдер сравнения ДО/ПОСЛЕ.
+function BeforeAfterSlider({ before, after }: { before: string; after: string }) {
+  const [pos, setPos] = useState(50); // позиция бегунка, %
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragging = useRef(false);
+
+  const setFromClientX = (clientX: number) => {
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const p = ((clientX - rect.left) / rect.width) * 100;
+    setPos(Math.max(0, Math.min(100, p)));
+  };
+
+  // Перетаскивание мышью — слушаем на window, пока зажато.
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (dragging.current) setFromClientX(e.clientX);
+    };
+    const onUp = () => {
+      dragging.current = false;
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative aspect-[4/3] w-full cursor-ew-resize touch-none select-none overflow-hidden rounded-lg bg-black/10"
+      onMouseDown={(e) => {
+        dragging.current = true;
+        setFromClientX(e.clientX);
+      }}
+      onTouchStart={(e) => setFromClientX(e.touches[0].clientX)}
+      onTouchMove={(e) => setFromClientX(e.touches[0].clientX)}
+    >
+      {/* Нижний слой — ПОСЛЕ */}
+      <img
+        src={after}
+        alt="После"
+        draggable={false}
+        className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+      />
+      {/* Верхний слой — ДО, обрезается справа по позиции бегунка */}
+      <div
+        className="absolute inset-0 overflow-hidden"
+        style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}
+      >
+        <img
+          src={before}
+          alt="До"
+          draggable={false}
+          className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+        />
+      </div>
+
+      {/* Подписи */}
+      <span className="pointer-events-none absolute left-2 top-2 rounded-md bg-black/55 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
+        До
+      </span>
+      <span className="pointer-events-none absolute right-2 top-2 rounded-md bg-black/55 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
+        После
+      </span>
+
+      {/* Разделитель + ручка */}
+      <div
+        className="absolute inset-y-0 z-10"
+        style={{ left: `${pos}%`, transform: "translateX(-50%)" }}
+      >
+        <div className="mx-auto h-full w-0.5 bg-gradient-to-b from-gold to-goldLight" />
+        <button
+          type="button"
+          aria-label="Двигать сравнение"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            dragging.current = true;
+          }}
+          className="absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-gold bg-stone text-gold shadow-gold"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="m9 7-5 5 5 5M15 7l5 5-5 5" />
+          </svg>
+        </button>
+      </div>
+    </div>
   );
 }
 
