@@ -288,6 +288,16 @@ export async function POST(req: NextRequest) {
 
   // Базовый промпт: IMAGE 1 = дом. Материал стен задаётся термопанелью (если выбрана).
   let prompt =
+    `CRITICAL STRUCTURAL LOCK — THIS IS THE MOST IMPORTANT RULE:\n` +
+    `IMAGE 1 is the real house to renovate. You MUST keep its EXACT structure 100% ` +
+    `unchanged: same number of floors, same roof shape and position, same number, size ` +
+    `and position of ALL windows and doors, same walls layout, same building height and ` +
+    `proportions, same camera angle and perspective, same background. Do NOT add floors, ` +
+    `do NOT add or remove windows, do NOT change the roof, do NOT redesign the building. ` +
+    `You are ONLY applying surface finishes (wall cladding, trim, plinth, columns) onto ` +
+    `the EXISTING house. The result must be instantly recognizable as the SAME house from ` +
+    `IMAGE 1, just with new facade finishing. If in doubt, keep IMAGE 1 as-is and change ` +
+    `less. NEVER generate a different building.\n\n` +
     `Facade redesign visualization.\n` +
     `IMAGE 1 = the house to redesign.\n\n` +
     `Keep strictly unchanged: building shape, all windows and window frames, doors, ` +
